@@ -1,0 +1,15 @@
+data:
+  drop_columns:
+  - max_glu_serum
+  - acetohexamide
+  - tolbutamide
+  - examide
+  - citoglipton
+  - glimepiride-pioglitazone
+  - metformin-rosiglitazone
+  - metformin-pioglitazone
+  min_max_columns:
+  - ""
+  standard_scalar_columns:
+  - ""
+  
