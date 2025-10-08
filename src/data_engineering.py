@@ -3,7 +3,7 @@ import sys
 import yaml
 from pydantic import BaseModel, ValidationError
 from typing import Dict, Any
-
+import logging
 
 
 import mlflow
@@ -12,7 +12,6 @@ from mlflow.models.signature import infer_signature
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.
 
 from typing import Tuple, List
 
@@ -26,7 +25,7 @@ def load_yaml_config() -> DataEngineeringConfig:
     ### Loads the different yaml configs
     config_path = "../configs/"
     data_engineering_config = "data_engineering_config.yaml"
-    with open(os.path.join(config_path + data_engineering_config), "rb") as f:
+    with open(os.path.join(config_path + data_engineering_config), "r") as f:
         config = yaml.safe_load(f)
     try:
         return DataEngineeringConfig(**config)
@@ -36,101 +35,66 @@ def load_yaml_config() -> DataEngineeringConfig:
 
 class DataEngineeringPipeLine:
     def __init__(self):
-        configs = load_yaml_config()
-        self.file_config = configs.file_information
-        self.mlflow_config = configs.mlflow_information
-        self.data_config = configs.data
-
+        logging.log("Attempting to load config")
+        try:
+            configs = load_yaml_config()
+            self.file_config = configs.file_information
+            self.mlflow_config = configs.mlflow_information
+            self.data_config = configs.data
+            self.safe_to_run = True
+            logging.log("Configuration loading succesful")
+        except ValidationError as e:
+            logging.log(f"Config loading failed error message {e}")
+            self.safe_to_run = False
 
     def load_data_to_pandas(self) -> pd.DataFrame:
-        return pd.read_csv(self.file_config(os.path.join(
-            self.file_config["data_dir_path"] + self.file_config["raw_data_path"]
-            + self.file_config["raw_data_file_name"]
-        )))
-
+        ### Loads data from file into a pandas dataframe
+        file_path = os.path.join(
+            self.file_config["data_dir_path"],
+            self.file_config["raw_data_path"],
+            self.file_config["raw_data_file_name"]
+        )
+        if os.path.exists(file_path):
+            logging.info(msg = "Raw file path exist and has been loaded")
+            return pd.read_csv(file_path)
+        else:
+            logging.info(msg = "Raw file path did not exist")
+            raise FileNotFoundError("File does not exist")
+        
     def transform_target_to_binary(self, data: pd.DataFrame) -> pd.DataFrame:
-        if self.data_config["target_to_binary"] == False: return pd.DataFrame
-        data[""]
+        if self.data_config["target_to_binary"] == False: return data 
         return data
     
+    def remove_columns(self, data: pd.DataFrame) -> pd.DataFrame:
+        columns_to_drop = self.data_config["drop_columns"]
+        mlflow.log_param("dropped columns", columns_to_drop)
+        return data.drop(columns = columns_to_drop)
+
+
 
     def run_pipeline(self):
         mlflow.set_experiment(self.mlflow_config["experiment_name"])
         with mlflow.start_run(run_name = "data engineering pipeline") as run:
-
-
-# Used to make readdmision variable binary
-def transform_target_to_binary(data_set: pd.DataFrame,
-                               target_variable: str, 
-                               mapping: dict= None) -> pd.DataFrame:
-    ### Map a Cateogrial variable to a binary one
-    if mapping is None: return data_set
-    data_set["target_variable"].map(mapping)
-    return data_set
-
-def remove_columns(data_set: pd.DataFrame,
-                   columns_to_remove) -> pd.DataFrame:
-    return data_set.drop(columns = columns_to_remove)
-
-
-
-def generate_new_features(data_set: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
-    return data_set, []
-
-def run_data_engineering() -> None:
-
-        mlflow.set_tag("data_set_tag",
-                   EXPERIMENT_DATA_TAG)
-        file_path = os.path.join(RAW_DATA_DIR, RAW_DATA_FILE_NAME)
-        if not os.path.exists(file_path):
-            mlflow.log_param("file_exists", False)
-            mlflow.log_param("file_path", file_path)
-            mlflow.set_tag("status", "error")
-            mlflow.log_text("File was not found on disk.", artifact_file="logs/error.txt")
-            ## If not file found just clean exit
-            sys.exit(0)
-        else:
-            mlflow.log_param("file_exists", True)
-            mlflow.set_tag("status", "ok")
-            mlflow.log_param("file_path", file_path)
-
-        data_set = read_csv_to_dataframe(file_path)
+            if  not self.safe_to_run:
+                logging.info("Failed to start pipeline")
+                mlflow.log_text("Failed to start pipeline")
+            try:
+                data = self.load_data_to_pandas()
+            except FileNotFoundError as e:
+                mlflow.log_text("File was not found experiment ending")
+                return
+            if self.data_config["target_to_binary"]:
+                logging.info("Transforming target to binary class")
+                data = self.transform_target_to_binary(data)
+            
+            
         
-        #2 ) Preprocessing
-        # 2.1 ) Remove columns
-        config_file_path = os.path.join(CONFIG_FILES, "preprocessing_config.yaml")
-        with open(config_file_path, "r") as f:
-            preprocessing_config = yaml.safe_load(f)
-        mlflow.log_artifact(config_file_path, artifact_path="config")
+                
+
+
+
         
-        
-        columns_to_drop = preprocessing_config["data"]["drop_columns"]
-        mlflow.log_param("dropped_columns", columns_to_drop)
-        data_set = remove_columns(data_set, columns_to_drop)
-
-        # 2.2 ) Engineer new features
-        data_set, new_columns_engineered = generate_new_features(data_set)
-
-        mlflow.log_param("new_features_added", new_columns_engineered)
-
-        # 2.3 ) Split into test and train
-
-        # 2.4 ) Impute values
 
 
-
-        # 2.5 ) Scale Data - train on trrain fit on both
-
-
-        # 3)
-
-
-
-
-    mlflow.end_run()
-
-if __name__ == "__main__":
-
-    run_data_engineering()
 
 
