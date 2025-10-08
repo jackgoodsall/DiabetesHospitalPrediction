@@ -1,0 +1,30 @@
+file_information:
+  data_dir_path: "../data"
+  raw_data_path: "raw_data"
+  processed_data_path: "processed_data"
+  raw_data_file_name:  "diabetic_data.csv"
+  processed_data_file_save_name:  "processed_data.csv"
+
+
+mlflow_information:
+  experiment_name: "data_engineering_1"
+  experiment_tag: "Basic data engineering"
+
+data:
+  drop_columns:
+  - max_glu_serum
+  - acetohexamide
+  - tolbutamide
+  - examide
+  - citoglipton
+  - glimepiride-pioglitazone
+  - metformin-rosiglitazone
+  - metformin-pioglitazone
+  min_max_columns:
+  - ""
+  standard_scalar_columns:
+    ""
+  untransformed_columns:
+   ""
+  target_to_binary: True
+  
