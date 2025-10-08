@@ -1,6 +1,10 @@
 import os 
 import sys
 import yaml
+from pydantic import BaseModel, ValidationError
+from typing import Dict, Any
+
+
 
 import mlflow
 from mlflow.models.signature import infer_signature
@@ -8,23 +12,52 @@ from mlflow.models.signature import infer_signature
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.
 
 from typing import Tuple, List
 
-RAW_DATA_DIR , RAW_DATA_FILE_NAME = "data/raw_data", "diabetic_data.csv"
-PRORCESSD_DATA_DIR = "data/processed_data"
+class DataEngineeringConfig(BaseModel):
+    ## Basic overhead schema for the data_engineering_config
+    file_information: Dict[str, Any]
+    mlflow_information: Dict[str, Any]
+    data: Dict[str, Any]
 
-CONFIG_FILES = "configs"
+def load_yaml_config() -> DataEngineeringConfig:
+    ### Loads the different yaml configs
+    config_path = "../configs/"
+    data_engineering_config = "data_engineering_config.yaml"
+    with open(os.path.join(config_path + data_engineering_config), "rb") as f:
+        config = yaml.safe_load(f)
+    try:
+        return DataEngineeringConfig(**config)
+    except ValidationError as e:
+        raise ValueError(f"Configuration missing required sections:\n{e}")
+    
 
-EXPERIMENT_NAME = "Experiment-1"
-EXPERIMENT_RAW_DATA_FILE_NAME = "experiment_1_processed.csv"
-EXPERIMENT_DATA_TAG = ""
+class DataEngineeringPipeLine:
+    def __init__(self):
+        configs = load_yaml_config()
+        self.file_config = configs.file_information
+        self.mlflow_config = configs.mlflow_information
+        self.data_config = configs.data
 
-RANDOM_SEED =  124314124
 
-def seed_everything(seed: int = RANDOM_SEED) -> None:
-    ## Set seed for every library used from random seed
-    np.random.seed(seed) 
+    def load_data_to_pandas(self) -> pd.DataFrame:
+        return pd.read_csv(self.file_config(os.path.join(
+            self.file_config["data_dir_path"] + self.file_config["raw_data_path"]
+            + self.file_config["raw_data_file_name"]
+        )))
+
+    def transform_target_to_binary(self, data: pd.DataFrame) -> pd.DataFrame:
+        if self.data_config["target_to_binary"] == False: return pd.DataFrame
+        data[""]
+        return data
+    
+
+    def run_pipeline(self):
+        mlflow.set_experiment(self.mlflow_config["experiment_name"])
+        with mlflow.start_run(run_name = "data engineering pipeline") as run:
+
 
 # Used to make readdmision variable binary
 def transform_target_to_binary(data_set: pd.DataFrame,
@@ -39,21 +72,13 @@ def remove_columns(data_set: pd.DataFrame,
                    columns_to_remove) -> pd.DataFrame:
     return data_set.drop(columns = columns_to_remove)
 
-def read_csv_to_dataframe(file_name: str) -> pd.DataFrame:
-    return pd.read_csv(file_name)
+
 
 def generate_new_features(data_set: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
     return data_set, []
 
 def run_data_engineering() -> None:
-    seed_everything()
 
-    if mlflow.active_run() is not None:
-        mlflow.end_run()
-    mlflow.set_experiment(EXPERIMENT_NAME)
-    
-    #1) Ingestion
-    with mlflow.start_run(run_name = "data ingestion") as run:
         mlflow.set_tag("data_set_tag",
                    EXPERIMENT_DATA_TAG)
         file_path = os.path.join(RAW_DATA_DIR, RAW_DATA_FILE_NAME)
