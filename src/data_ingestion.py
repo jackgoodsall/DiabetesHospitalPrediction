@@ -1,19 +1,18 @@
-import os 
-import sys
-import yaml
-from pydantic import BaseModel, ValidationError
-from typing import Dict, Any
 import logging
-
+import os
+import sys
+from typing import Any, Dict, List, Tuple
 
 import mlflow
-from mlflow.models.signature import infer_signature
-
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import yaml
+from mlflow.models.signature import infer_signature
+from pydantic import BaseModel, ValidationError
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-from typing import Tuple, List
+logger = logging.getLogger(__name__)
+
 
 class DataInputCleaningPipeLineConfig(BaseModel):
     ## Basic overhead schema for the data_engineering_config
@@ -42,9 +41,9 @@ class DataInputCleaningPipeLine:
             self.mlflow_config = configs.mlflow_information
             self.data_config = configs.data
             self.safe_to_run = True
-            logging.log("Configuration loading succesful")
+            logger.log("Configuration loading succesful")
         except ValidationError as e:
-            logging.log(f"Config loading failed error message {e}")
+            logger.log(f"Config loading failed error message {e}")
             self.safe_to_run = False
 
     def load_data_to_pandas(self) -> pd.DataFrame:
@@ -74,7 +73,7 @@ class DataInputCleaningPipeLine:
         mlflow.set_experiment(self.mlflow_config["experiment_name"])
         with mlflow.start_run(run_name = "data engineering pipeline") as run:
             if  not self.safe_to_run:
-                logging.info("Failed to start pipeline")
+                logger.info("Failed to start pipeline")
                 mlflow.log_text("Failed to start pipeline")
             try:
                 data = self.load_data_to_pandas()
@@ -82,7 +81,7 @@ class DataInputCleaningPipeLine:
                 mlflow.log_text("File was not found experiment ending")
                 return
             if self.data_config["target_to_binary"]:
-                logging.info("Transforming target to binary class")
+                logger.info("Transforming target to binary class")
                 data = self.transform_target_to_binary(data)
             
             
