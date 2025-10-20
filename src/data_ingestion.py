@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from typing import Any, Dict, List, Tuple
+from pathlib import Path
 
 import mlflow
 import numpy as np
@@ -20,6 +21,7 @@ class DataInputCleaningPipeLineConfig(BaseModel):
     mlflow_information: Dict[str, Any]
     data: Dict[str, Any]
 
+
 def load_yaml_config() -> DataInputCleaningPipeLineConfig:
     ### Loads the different yaml configs
     config_path = "../configs/"
@@ -30,9 +32,13 @@ def load_yaml_config() -> DataInputCleaningPipeLineConfig:
         return DataInputCleaningPipeLineConfig(**config)
     except ValidationError as e:
         raise ValueError(f"Configuration missing required sections:\n{e}")
-    
+
 
 class DataInputCleaningPipeLine:
+    """
+    Class for a Data input and cleaning pipeline, integrated with logging and 
+    mlflow.
+    """
     def __init__(self):
         logging.log("Attempting to load config")
         try:
@@ -51,28 +57,29 @@ class DataInputCleaningPipeLine:
         file_path = os.path.join(
             self.file_config["data_dir_path"],
             self.file_config["raw_data_path"],
-            self.file_config["raw_data_file_name"]
+            self.file_config["raw_data_file_name"],
         )
         if os.path.exists(file_path):
-            logging.info(msg = "Raw file path exist and has been loaded")
+            logging.info(msg="Raw file path exist and has been loaded")
             return pd.read_csv(file_path)
         else:
-            logging.info(msg = "Raw file path did not exist")
+            logging.info(msg="Raw file path did not exist")
             raise FileNotFoundError("File does not exist")
-        
+
     def transform_target_to_binary(self, data: pd.DataFrame) -> pd.DataFrame:
-        if self.data_config["target_to_binary"] == False: return data 
+        if self.data_config["target_to_binary"] == False:
+            return data
         return data
-    
+
     def remove_columns(self, data: pd.DataFrame) -> pd.DataFrame:
         columns_to_drop = self.data_config["drop_columns"]
         mlflow.log_param("dropped columns", columns_to_drop)
-        return data.drop(columns = columns_to_drop)
+        return data.drop(columns=columns_to_drop)
 
     def run_pipeline(self):
         mlflow.set_experiment(self.mlflow_config["experiment_name"])
-        with mlflow.start_run(run_name = "data engineering pipeline") as run:
-            if  not self.safe_to_run:
+        with mlflow.start_run(run_name="data engineering pipeline") as run:
+            if not self.safe_to_run:
                 logger.info("Failed to start pipeline")
                 mlflow.log_text("Failed to start pipeline")
             try:
@@ -83,15 +90,11 @@ class DataInputCleaningPipeLine:
             if self.data_config["target_to_binary"]:
                 logger.info("Transforming target to binary class")
                 data = self.transform_target_to_binary(data)
-            
-            
-        
-                
-
-
-
-        
-
-
-
-
+            logger.info("Removing unneeded columns defined in config")
+            data = self.remove_columns()
+            logger.info("Removed columns from the dataframe defined in the config")
+            save_path = Path(self.file_config["processed_data_path"] / self.file_config["processed_data.csv"])
+            data.to_csv(save_path)
+            logger.info(f"Wrote data back out to {save_path}")
+            ## Save as attribute to use externally
+            self.data = data
