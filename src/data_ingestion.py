@@ -77,8 +77,15 @@ class DataInputCleaningPipeLine:
         return data.drop(columns=columns_to_drop)
 
     def run_pipeline(self):
-        mlflow.set_experiment(self.mlflow_config["experiment_name"])
-        with mlflow.start_run(run_name="data engineering pipeline") as run:
+
+        if mlflow.active_run is not None:
+            logger.log("Detected higher level run, starting nested run")
+            run_ctx = mlflow.start_run(run_name="data engineering pipeline", nested = True)
+        else:
+            experiment_name = self.mlflow_config.get("experiment_name", "")
+            logger.log(f"No higher level run detected, starting new run with name ")
+            mlflow.set_experiment(experiment_name)
+        with run_ctx as run:
             if not self.safe_to_run:
                 logger.info("Failed to start pipeline")
                 mlflow.log_text("Failed to start pipeline")
@@ -87,13 +94,14 @@ class DataInputCleaningPipeLine:
             except FileNotFoundError as e:
                 mlflow.log_text("File was not found experiment ending")
                 return
+            
             if self.data_config["target_to_binary"]:
                 logger.info("Transforming target to binary class")
                 data = self.transform_target_to_binary(data)
             logger.info("Removing unneeded columns defined in config")
             data = self.remove_columns()
             logger.info("Removed columns from the dataframe defined in the config")
-            save_path = Path(self.file_config["processed_data_path"] / self.file_config["processed_data.csv"])
+            save_path = Path(self.file_config["processed_data_path"] , self.file_config["processed_data.csv"])
             data.to_csv(save_path)
             logger.info(f"Wrote data back out to {save_path}")
             ## Save as attribute to use externally
