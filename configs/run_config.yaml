@@ -1,0 +1,80 @@
+file_information:
+  data_dir_path: "../data"
+  raw_data_path: "raw_data"
+  processed_data_path: "processed_data"
+  raw_data_file_name:  "diabetic_data.csv"
+  processed_data_file_save_name:  "processed_data.csv"
+
+
+mlflow_information:
+  experiment_name: "data_engineering_1"
+  experiment_tag: "Basic data engineering"
+
+data:
+  drop_columns:
+  - max_glu_serum,
+  - acetohexamide,
+  - tolbutamide,
+  - examide,
+  - citoglipton,
+  - glimepiride-pioglitazone,
+  - metformin-rosiglitazone,
+  - metformin-pioglitazone,
+  - encounter_id,
+  - patient_nbr,
+  - admission_type_id,
+  - discharge_disposition_id,
+  - admission_source_id,
+
+  target_column_name: readmitted
+  target_to_binary: True
+  numerical_columns:
+    time_in_hospital,
+    num_lab_procedures,
+    num_medications,
+    number_outpatient,
+    number_emergency,
+    number_diagnoses,
+    number_inpatient,
+  categorical_columns:
+    race,
+    gender,
+    age,
+    weight,
+    medical_specialty,
+    diag_1,
+    diag_2,
+    diag_3,
+    number_diagnoses,
+    A1Cresult,
+    metformin,
+    repaglinide,
+    nateglinide,
+    chlorpropamide,
+    glimepiride,
+    glipizide,
+    glyburide,
+    pioglitazone,
+    rosiglitazone,
+    acarbose,
+    miglitol,
+    troglitazone,
+    tolazamide,
+    insulin,
+    glyburide-metformin,
+    glipizide-metformin,
+    change,
+    diabetesMed,
+
+  
+model:
+  model_names: xgboost
+  
+
+## Configs for the models - for training uses the model defined above.
+logistic_regression:
+  list_configs
+
+
+xgboost:
+
