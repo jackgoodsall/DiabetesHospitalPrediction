@@ -39,19 +39,24 @@ class DataInputCleaningPipeLine:
     Class for a Data input and cleaning pipeline, integrated with logging and 
     mlflow.
     """
-    def __init__(self):
-        logging.log("Attempting to load config")
-        try:
-            configs = load_yaml_config()
-            self.file_config = configs.file_information
-            self.mlflow_config = configs.mlflow_information
-            self.data_config = configs.data
-            self.safe_to_run = True
-            logger.log("Configuration loading succesful")
-        except ValidationError as e:
-            logger.log(f"Config loading failed error message {e}")
-            self.safe_to_run = False
-
+    def __init__(self, config = None):
+        
+        if config is None:
+            logging.log("No config provided attempting to load config")
+            try:
+                configs = load_yaml_config()
+                self.file_config = configs.file_information
+                self.mlflow_config = configs.mlflow_information
+                self.data_config = configs.data
+                self.safe_to_run = True
+                logger.log("Configuration loading succesful")
+            except ValidationError as e:
+                logger.log(f"Config loading failed error message {e}")
+                self.safe_to_run = False
+        else:
+            logging.log("Config passed, using this as config")
+            self.config  = config
+            
     def load_data_to_pandas(self) -> pd.DataFrame:
         ### Loads data from file into a pandas dataframe
         file_path = os.path.join(
