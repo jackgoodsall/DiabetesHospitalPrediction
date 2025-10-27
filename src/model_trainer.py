@@ -1,4 +1,5 @@
 from src.components.training_splits import split_df, cross_validation_splits
+from src.components.model_evaluation import binary_classifcation_report
 from model_builder import build_estimator
 from data_ingestion import DataInputCleaningPipeLine
 from components.data_engineering import DataEngineeringPipeLine
@@ -64,11 +65,18 @@ class ModelTrainer:
 
         oof_predictions = np.zeros_like(y)
 
-        for train_idx, val_indx in splitter:
-            
-            
+        for train_idx, val_idx in splitter:
+            (X_train, X_val,
+              y_train, y_val) =(X[train_idx], y[train_idx],
+                                X[val_idx], y[val_idx]) 
             if hasattr(model, "fit"):
-                model.fit(X, y)
+                model.fit(X_train, y_train)
+                oof_predictions[val_idx] = model.predict_proba(X_val)[ :, 1]
+        oof_metrics = binary_classifcation_report(y, oof_predictions)
+        ## Refit model on whole training data
+        model.fit(X_train, y_train)        
+        return model, oof_metrics
+
 
 
 
@@ -108,21 +116,26 @@ class ModelTrainer:
         X = self.train.drop(columns = target)
         y = self.train[target]
 
+        X_test = self.test.drop(columns = target)
+        y_test = self.test[target]
+
         logger.info("Starting mlflow run and training models")
-        with mlflow.start_run():
+        nested = True if mlflow.active_run() else False
+        with mlflow.start_run("Model Training", nested = nested)
             for model_name in model_names:
                 logger.log(f"Training model {model_name}")
                 estimator_configs = self.config.model_extra.get(model_name, {})
                 current_model = build_estimator(model_name, **estimator_configs)
-                self._train_model(
+                current_model, oof_predictions = self._train_model(
                     current_model,
                     X,
                     y,
                     cross_validation_splits(self.train,
                                             random_state = seed)
-
                 )
-                
+                logger.log(f"Training {model_name} was succesful!")
+                test_predictions = current_model.predict_proba(X_test)[:, 1]
+                test_metrics = binary_classifcation_report(self.y_test, test_predictions)
                 
 
 
