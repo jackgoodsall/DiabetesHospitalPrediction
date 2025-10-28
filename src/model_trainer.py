@@ -1,8 +1,8 @@
-from src.components.training_splits import split_df, cross_validation_splits
-from src.components.model_evaluation import binary_classifcation_report
+from components.training_splits import split_df, cross_validation_splits
+from components.model_evaluation import binary_classifcation_report
 from model_builder import build_estimator
 from data_ingestion import DataInputCleaningPipeLine
-from components.data_engineering import DataEngineeringPipeLine
+from components.data_engineering import DataEngineeringPipeLine, DataEngineeringConfig
 
 from typing import Dict, Any
 from pydantic import BaseModel, ValidationError, ConfigDict
@@ -16,19 +16,19 @@ import numpy as np
 
 logger  = logging.getLogger(__name__)
 
+CONFIG_PATH = "configs/run_config.yaml"
+
 class ModelTrainingConfig(BaseModel):
     ## Basic overhead schema for the data_engineering_config
     model_config = ConfigDict(extra = "allow")
 
     model: Dict[str, Any]
     mlflow_information: Dict[str, Any]
-    data_engineering: Dict[str, Any]
+    data: Dict[str, Any]
 
 def load_yaml_config() -> ModelTrainingConfig:
     ### Loads the different yaml configs
-    config_path = "../configs/"
-    data_engineering_config = "model_training_config.yaml"
-    with open(os.path.join(config_path + data_engineering_config), "r") as f:
+    with open(CONFIG_PATH, "r") as f:
         config = yaml.safe_load(f)
     try:
         return ModelTrainingConfig(**config)
@@ -45,7 +45,7 @@ class ModelTrainer:
         logger.info("Data input pipeline initiation finished," \
             "data engineering pipeline initiation starting to run.")
         self._data_transformation_pipeline = DataEngineeringPipeLine(
-            self.config.data_engineering
+            DataEngineeringConfig(**self.config.model_extra["data_engineering"])
         )
         logger.info("Data engineering pipeline initation finished.")
 
@@ -74,31 +74,34 @@ class ModelTrainer:
                 oof_predictions[val_idx] = model.predict_proba(X_val)[ :, 1]
         oof_metrics = binary_classifcation_report(y, oof_predictions)
         ## Refit model on whole training data
-        model.fit(X_train, y_train)        
+        model.fit(X, y)        
         return model, oof_metrics
-
-
-
-
 
     def run_pipeline(self):
         experiment_name = self.config.mlflow_information["experiment_name"]
-        experiment_tag = self.config.mlflow_information["experimment_Tag"]
-        mlflow.set_experiment()
+        experiment_tag = self.config.mlflow_information["experiment_tag"]
+        mlflow.set_experiment(
+            experiment_name = experiment_name
+        )
 
         seed = np.random.randint(0, 2**32 - 1)
         logger.info(f"Generated random seed for this run as {seed}")
         np.random.seed(seed)
-        mlflow.log()
         logger.info("Running Pipeline")
         self._data_input_pipeline.run_pipeline()
         logger.info("Splitting data")
-        train, test = split_df(self._data_input_pipeline.data)
+        target = self.config.data["target_column_name"]
+        train, test = split_df(self._data_input_pipeline.data,
+                               test_size = 0.2,
+                               target = target)
         logger.info("Transforming data")
-        self._data_transformation_pipeline.fit(self.train)
 
-        self.train = self._data_transformation_pipeline.transform(train)
-        self.test = self._data_transformation_pipeline.transform(test)
+        X_train, y_train = train.drop(columns = target), train[target]
+        X_test, y_test =  test.drop(columns = target), test[target]
+        self._data_transformation_pipeline.fit(X_train)
+
+        self.train = self._data_transformation_pipeline.transform(X_train)
+        self.test = self._data_transformation_pipeline.transform(X_test)
 
         
         
@@ -112,34 +115,33 @@ class ModelTrainer:
         ### Split data into X and y for the model training step - makes code 
         ### cleaner/easier to read
         logger.info("Splitting into X and y arrays from dataframe")
-        target = self.config.model_extra["data"]["target_column_name"]
-        X = self.train.drop(columns = target)
-        y = self.train[target]
-
-        X_test = self.test.drop(columns = target)
-        y_test = self.test[target]
 
         logger.info("Starting mlflow run and training models")
         nested = True if mlflow.active_run() else False
-        with mlflow.start_run("Model Training", nested = nested)
+        with mlflow.start_run(run_name  = "Model Training", nested = nested):
             for model_name in model_names:
-                logger.log(f"Training model {model_name}")
+                logger.info(f"Training model {model_name}")
                 estimator_configs = self.config.model_extra.get(model_name, {})
                 current_model = build_estimator(model_name, **estimator_configs)
+                mlflow.log_params(**estimator_configs)
                 current_model, oof_predictions = self._train_model(
                     current_model,
-                    X,
-                    y,
-                    cross_validation_splits(self.train,
+                    X_train,
+                    y_train,
+                    cross_validation_splits(X_train,
                                             random_state = seed)
                 )
-                logger.log(f"Training {model_name} was succesful!")
+                logger.info(f"Training {model_name} was succesful!")
                 test_predictions = current_model.predict_proba(X_test)[:, 1]
                 test_metrics = binary_classifcation_report(self.y_test, test_predictions)
+                mlflow.log_metrics("test_metrics", **test_metrics)
+                mlflow.log_metrics("oof_metrics", **oof_predictions)
                 
 
-
-
+if __name__ == "__main__":
+    config_object = load_yaml_config()
+    model_trainer = ModelTrainer(config_object)
+    model_trainer.run_pipeline()
         
         
     
