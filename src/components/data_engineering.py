@@ -78,30 +78,29 @@ class DataEngineeringPipeLine:
             [
                 (
                     "cat_imputer",
-                    SimpleImputer(st=self.config.categorical_imputer_strat),
+                    SimpleImputer(strategy=self.config.categorical_imputer_strat),
                 ),
                 ("one_hot", OneHotEncoder()),
             ]
         )
         self._categorical_pipeline = categorical_pipeline
         logger.debug("Built categorical pipeline", self._categorical_pipeline)
-        self._pipeline.set_output(transform="pandas")
-        logger.debug("Built full column transformer: %s", self._pipeline)
 
     def _build_pipeline(self) -> None:
         self._pipeline = ColumnTransformer(
             [
-                (
+                
                     ("num pipeline", self._numerical_pipeline, self.numerical_features),
                     (
                         "cat pipeline",
                         self._categorical_pipeline,
                         self.categorical_features,
                     ),
-                ),
+    
             ],
             remainder=self.config.remainder,
         )
+        self._pipeline.set_output(transform="pandas")
         logger.debug("Built full pipeline", self._pipeline)
 
     ## Functions to fit, transform and fit transform
