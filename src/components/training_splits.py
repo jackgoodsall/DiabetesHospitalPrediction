@@ -25,7 +25,7 @@ def split_df(
     return train_df, test_df
 
 def cross_validation_splits(
-        df: pd.DataFrame,
+        X: np.ndarray,
         target : str = None,
         n_splits: int = 5,
         stratergy: str = "kfold",
@@ -42,7 +42,7 @@ def cross_validation_splits(
     if stratergy not in {"kfold", "stratified"}:
         raise ValueError(f"Unknown stratergy {stratergy}")
     # Split on index
-    idx = np.arange(len(df))
+    idx = np.arange(len(X))
 
     # K fold
     if stratergy == "kfold":
@@ -51,8 +51,8 @@ def cross_validation_splits(
             if return_indices:
                 yield tr_idx, val_idx
             else:
-                yield df.iloc[tr_idx], df.iloc[val_idx]
-    # Stratified k fold
+                yield X[tr_idx], X[val_idx]
+   """  # Stratified k fold
     if stratergy == "stratified":
         assert target is not None ; "Target must not be none"
         y = df[target].to_nummpy()
@@ -63,3 +63,4 @@ def cross_validation_splits(
             else:
                 yield df.iloc[tr_idx], df.iloc[val_idx]
 
+ """
