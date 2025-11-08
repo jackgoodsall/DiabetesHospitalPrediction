@@ -80,7 +80,7 @@ class DataEngineeringPipeLine:
                     "cat_imputer",
                     SimpleImputer(strategy=self.config.categorical_imputer_strat),
                 ),
-                ("one_hot", OneHotEncoder()),
+                ("one_hot", OneHotEncoder(sparse_output=False, handle_unknown="ignore")),
             ]
         )
         self._categorical_pipeline = categorical_pipeline
@@ -100,7 +100,7 @@ class DataEngineeringPipeLine:
             ],
             remainder=self.config.remainder,
         )
-        self._pipeline.set_output(transform="pandas")
+        self._pipeline.set_output(transform="default")
         logger.debug("Built full pipeline", self._pipeline)
 
     ## Functions to fit, transform and fit transform
