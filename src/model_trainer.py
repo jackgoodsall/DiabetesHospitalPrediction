@@ -14,6 +14,8 @@ import mlflow
 
 import numpy as np
 
+from datetime import datetime
+
 logger  = logging.getLogger(__name__)
 
 CONFIG_PATH = "configs/run_config.yaml"
@@ -38,16 +40,6 @@ def load_yaml_config() -> ModelTrainingConfig:
 class ModelTrainer:
     def __init__(self, config):
         self.config : ModelTrainingConfig = config
-
-        logger.info("Initiating pipeline")
-        logger.info("Running Data input pipeline")
-        self._data_input_pipeline = DataInputCleaningPipeLine()
-        logger.info("Data input pipeline initiation finished," \
-            "data engineering pipeline initiation starting to run.")
-        self._data_transformation_pipeline = DataEngineeringPipeLine(
-            DataEngineeringConfig(**self.config.model_extra["data_engineering"])
-        )
-        logger.info("Data engineering pipeline initation finished.")
 
     def _train_model(self,
                      model,
@@ -81,8 +73,19 @@ class ModelTrainer:
         experiment_name = self.config.mlflow_information["experiment_name"]
         experiment_tag = self.config.mlflow_information["experiment_tag"]
         mlflow.set_experiment(
-            experiment_name = experiment_name
+            experiment_name = f"{experiment_name}{datetime.now():%Y%m%d_%H%M%S}"
         )
+
+        ## Running data pipelines
+        logger.info("Initiating pipeline")
+        logger.info("Running Data input pipeline")
+        self._data_input_pipeline = DataInputCleaningPipeLine()
+        logger.info("Data input pipeline initiation finished," \
+            "data engineering pipeline initiation starting to run.")
+        self._data_transformation_pipeline = DataEngineeringPipeLine(
+            DataEngineeringConfig(**self.config.model_extra["data_engineering"])
+        )
+        logger.info("Data engineering pipeline initation finished.")
 
         seed = np.random.randint(0, 2**32 - 1)
         logger.info(f"Generated random seed for this run as {seed}")
@@ -121,9 +124,10 @@ class ModelTrainer:
         with mlflow.start_run(run_name  = "Model Training", nested = nested):
             for model_name in model_names:
                 logger.info(f"Training model {model_name}")
-                estimator_configs = self.config.model_extra.get(model_name, {})
+                estimator_configs = self.config.model_extra.get(model_name, {}) 
+                estimator_configs = estimator_configs if estimator_configs is  not None else {}
                 current_model = build_estimator(model_name, **estimator_configs)
-                mlflow.log_params(**estimator_configs)
+                mlflow.log_params(estimator_configs)
                 current_model, oof_predictions = self._train_model(
                     current_model,
                     X_train,
@@ -134,14 +138,20 @@ class ModelTrainer:
                 logger.info(f"Training {model_name} was succesful!")
                 test_predictions = current_model.predict_proba(X_test)[:, 1]
                 test_metrics = binary_classifcation_report(self.y_test, test_predictions)
-                mlflow.log_metrics("test_metrics", **test_metrics)
-                mlflow.log_metrics("oof_metrics", **oof_predictions)
+                mlflow.log_metrics("test_metrics", test_metrics)
+                mlflow.log_metrics("oof_metrics", oof_predictions)
                 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+    level=logging.DEBUG,  # show everything DEBUG and up
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
+
     config_object = load_yaml_config()
-    model_trainer = ModelTrainer(config_object)
-    model_trainer.run_pipeline()
+    with mlflow.start_run(run_name = "a"):
+        model_trainer = ModelTrainer(config_object)
+        model_trainer.run_pipeline()
         
         
     
