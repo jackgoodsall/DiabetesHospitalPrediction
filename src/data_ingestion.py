@@ -73,8 +73,13 @@ class DataInputCleaningPipeLine:
             raise FileNotFoundError("File does not exist")
 
     def transform_target_to_binary(self, data: pd.DataFrame) -> pd.DataFrame:
-        if self.data_config["target_to_binary"] == False:
-            return data
+        target = self.data_config["target_column_name"]
+        mapping  = {
+            "NO" : 0,
+            ">30" : 1,
+            "<30" : 1, 
+        }
+        data[target] = data[target].map(mapping)
         return data
 
     def remove_columns(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -84,7 +89,7 @@ class DataInputCleaningPipeLine:
 
     def run_pipeline(self):
 
-        if mlflow.active_run is not None:
+        if mlflow.active_run() is not None:
             logger.info("Detected higher level run, starting nested run")
             run_ctx = mlflow.start_run(run_name="data engineering pipeline", nested = True)
         else:
