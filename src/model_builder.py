@@ -1,6 +1,7 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier 
+from xgboost import XGBClassifier
+
 
 def build_estimator(name: str, **model_configs):
     """
@@ -12,6 +13,5 @@ def build_estimator(name: str, **model_configs):
     if name == "random_forest":
         return RandomForestClassifier(model_configs)
     if name == "xgboost":
-        return XGBClassifier(model_configs)
+        return XGBClassifier(**model_configs)
     return ValueError(f"Unknown model: {name}")
-
