@@ -55,15 +55,16 @@ class ModelTrainer:
         needs manual implemention/adding
         """
 
-        oof_predictions = np.zeros_like(y)
+        oof_predictions = np.zeros(len(y))
 
         for train_idx, val_idx in splitter:
-            (X_train, X_val,
-              y_train, y_val) =(X[train_idx], y[train_idx],
+            (X_train, y_train,
+              X_val, y_val) =(X[train_idx], y[train_idx],
                                 X[val_idx], y[val_idx]) 
             if hasattr(model, "fit"):
                 model.fit(X_train, y_train)
                 oof_predictions[val_idx] = model.predict_proba(X_val)[ :, 1]
+        print(oof_predictions)
         oof_metrics = binary_classifcation_report(y, oof_predictions)
         ## Refit model on whole training data
         model.fit(X, y)        
@@ -99,14 +100,15 @@ class ModelTrainer:
                                target = target)
         logger.info("Transforming data")
 
-        X_train, y_train = train.drop(columns = target), train[target]
-        X_test, y_test =  test.drop(columns = target), test[target]
+        X_train, y_train = train.drop(columns = target), train[target].to_numpy()
+        X_test, y_test =  test.drop(columns = target), test[target].to_numpy()
         self._data_transformation_pipeline.fit(X_train)
+        ohe = self._data_transformation_pipeline._pipeline.named_transformers_["cat pipeline"].named_steps["one_hot"]
+        print(ohe.get_feature_names_out(self._data_transformation_pipeline._pipeline.named_transformers_["cat pipeline"].feature_names_in_))
+        X_train = self._data_transformation_pipeline.transform(X_train).to_numpy()
+        X_test= self._data_transformation_pipeline.transform(X_test).to_numpy()
 
-        self.train = self._data_transformation_pipeline.transform(X_train)
-        self.test = self._data_transformation_pipeline.transform(X_test)
-
-        
+        print(sum(y_test))
         
         ### Get a list of models to train from the config, if only one convert to list
         logger.info("Getting models from config")
@@ -133,20 +135,21 @@ class ModelTrainer:
                     X_train,
                     y_train,
                     cross_validation_splits(X_train,
+                                            return_indices= True,
                                             random_state = seed)
                 )
                 logger.info(f"Training {model_name} was succesful!")
                 test_predictions = current_model.predict_proba(X_test)[:, 1]
-                test_metrics = binary_classifcation_report(self.y_test, test_predictions)
-                mlflow.log_metrics("test_metrics", test_metrics)
-                mlflow.log_metrics("oof_metrics", oof_predictions)
+                test_metrics = binary_classifcation_report(y_test, test_predictions)
+                mlflow.log_metrics( test_metrics)
+                mlflow.log_metrics( oof_predictions)
                 
 
 if __name__ == "__main__":
-    logging.basicConfig(
+    """ logging.basicConfig(
     level=logging.DEBUG,  # show everything DEBUG and up
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    )
+    ) """
 
     config_object = load_yaml_config()
     with mlflow.start_run(run_name = "a"):
