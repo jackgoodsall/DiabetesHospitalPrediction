@@ -52,7 +52,7 @@ def cross_validation_splits(
                 yield tr_idx, val_idx
             else:
                 yield X[tr_idx], X[val_idx]
-   """  # Stratified k fold
+    """  # Stratified k fold
     if stratergy == "stratified":
         assert target is not None ; "Target must not be none"
         y = df[target].to_nummpy()

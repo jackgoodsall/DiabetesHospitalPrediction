@@ -100,7 +100,7 @@ class DataEngineeringPipeLine:
             ],
             remainder=self.config.remainder,
         )
-        self._pipeline.set_output(transform="default")
+        self._pipeline.set_output(transform="pandas")
         logger.debug("Built full pipeline", self._pipeline)
 
     ## Functions to fit, transform and fit transform
@@ -109,7 +109,8 @@ class DataEngineeringPipeLine:
         logger.info("Data was valid with the config and fitting the pipeline")
         self._pipeline = self._pipeline.fit(data)
         self.is_fit = True
-
+        return self
+    
     def transform(self, data: pd.DataFrame) -> pd.DataFrame:
         if not self.is_fit:
             raise NotFittedError("Pipeline is not fit")
