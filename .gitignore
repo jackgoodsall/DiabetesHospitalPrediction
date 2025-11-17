@@ -3,5 +3,4 @@ diabetes/
 mlruns/
 .ruff_cache/
 models/
-
 __pycache__/

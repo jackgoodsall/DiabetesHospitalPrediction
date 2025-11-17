@@ -1,0 +1,4 @@
+.venv/
+diabetes/
+__pycache__/
+.env
