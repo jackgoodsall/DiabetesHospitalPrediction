@@ -3,11 +3,8 @@ from typing import Tuple, Optional
 import pandas as pd
 import numpy as np
 
-from sklearn.model_selection import (
-    KFold,
-    StratifiedKFold,
-    train_test_split  
-)
+from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
+
 
 def split_df(
     df: pd.DataFrame,
@@ -24,14 +21,15 @@ def split_df(
     train_df, test_df = train_test_split(df, test_size=test_size)
     return train_df, test_df
 
+
 def cross_validation_splits(
-        X: np.ndarray,
-        target : str = None,
-        n_splits: int = 5,
-        stratergy: str = "kfold",
-        shuffle = True,
-        return_indices: bool = False,
-        random_state = None
+    X: np.ndarray,
+    target: str = None,
+    n_splits: int = 5,
+    stratergy: str = "kfold",
+    shuffle=True,
+    return_indices: bool = False,
+    random_state=None,
 ):
     """
     Yield CV splits as (train_idx, val_idx) or (train_df, val_df) depending
@@ -46,7 +44,7 @@ def cross_validation_splits(
 
     # K fold
     if stratergy == "kfold":
-        splitter = KFold(n_splits, shuffle = shuffle, random_state= random_state)
+        splitter = KFold(n_splits, shuffle=shuffle, random_state=random_state)
         for tr_idx, val_idx in splitter.split(idx):
             if return_indices:
                 yield tr_idx, val_idx

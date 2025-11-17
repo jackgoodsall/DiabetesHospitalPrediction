@@ -80,7 +80,10 @@ class DataEngineeringPipeLine:
                     "cat_imputer",
                     SimpleImputer(strategy=self.config.categorical_imputer_strat),
                 ),
-                ("one_hot", OneHotEncoder(sparse_output=False, handle_unknown="ignore")),
+                (
+                    "one_hot",
+                    OneHotEncoder(sparse_output=False, handle_unknown="ignore"),
+                ),
             ]
         )
         self._categorical_pipeline = categorical_pipeline
@@ -89,14 +92,12 @@ class DataEngineeringPipeLine:
     def _build_pipeline(self) -> None:
         self._pipeline = ColumnTransformer(
             [
-                
-                    ("num pipeline", self._numerical_pipeline, self.numerical_features),
-                    (
-                        "cat pipeline",
-                        self._categorical_pipeline,
-                        self.categorical_features,
-                    ),
-    
+                ("num pipeline", self._numerical_pipeline, self.numerical_features),
+                (
+                    "cat pipeline",
+                    self._categorical_pipeline,
+                    self.categorical_features,
+                ),
             ],
             remainder=self.config.remainder,
         )
@@ -110,7 +111,7 @@ class DataEngineeringPipeLine:
         self._pipeline = self._pipeline.fit(data)
         self.is_fit = True
         return self
-    
+
     def transform(self, data: pd.DataFrame) -> pd.DataFrame:
         if not self.is_fit:
             raise NotFittedError("Pipeline is not fit")

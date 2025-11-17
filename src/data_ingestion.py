@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class DataInputCleaningPipeLineConfig(BaseModel):
     ## Basic overhead schema for the data_engineering_config
-    model_config = ConfigDict(extra = "allow")
+    model_config = ConfigDict(extra="allow")
 
     file_information: Dict[str, Any]
     mlflow_information: Dict[str, Any]
@@ -37,11 +37,11 @@ def load_yaml_config() -> DataInputCleaningPipeLineConfig:
 
 class DataInputCleaningPipeLine:
     """
-    Class for a Data input and cleaning pipeline, integrated with logging and 
+    Class for a Data input and cleaning pipeline, integrated with logging and
     mlflow.
     """
-    def __init__(self, config = None):
-        
+
+    def __init__(self, config=None):
         if config is None:
             logger.info("No config provided attempting to load config")
             try:
@@ -56,8 +56,8 @@ class DataInputCleaningPipeLine:
                 self.safe_to_run = False
         else:
             logger.info("Config passed, using this as config")
-            self.config  = config
-            
+            self.config = config
+
     def load_data_to_pandas(self) -> pd.DataFrame:
         ### Loads data from file into a pandas dataframe
         self.file_path = os.path.join(
@@ -74,10 +74,10 @@ class DataInputCleaningPipeLine:
 
     def transform_target_to_binary(self, data: pd.DataFrame) -> pd.DataFrame:
         target = self.data_config["target_column_name"]
-        mapping  = {
-            "NO" : 0,
-            ">30" : 1,
-            "<30" : 1, 
+        mapping = {
+            "NO": 0,
+            ">30": 1,
+            "<30": 1,
         }
         data[target] = data[target].map(mapping)
         return data
@@ -88,10 +88,11 @@ class DataInputCleaningPipeLine:
         return data.drop(columns=columns_to_drop)
 
     def run_pipeline(self):
-
         if mlflow.active_run() is not None:
             logger.info("Detected higher level run, starting nested run")
-            run_ctx = mlflow.start_run(run_name="data engineering pipeline", nested = True)
+            run_ctx = mlflow.start_run(
+                run_name="data engineering pipeline", nested=True
+            )
         else:
             experiment_name = self.mlflow_config.get("experiment_name", "")
             logger.info(f"No higher level run detected, starting new run with name ")
@@ -105,16 +106,18 @@ class DataInputCleaningPipeLine:
             except FileNotFoundError as e:
                 logger.warning(f"File not found error {e}")
                 raise FileNotFoundError(f"Could not find {self.file_path}")
-            
+
             if self.data_config["target_to_binary"]:
                 logger.info("Transforming target to binary class")
                 data = self.transform_target_to_binary(data)
             logger.info("Removing unneeded columns defined in config")
             data = self.remove_columns(data)
             logger.info("Removed columns from the dataframe defined in the config")
-            save_path = Path( self.file_config["data_dir_path"],
-                             self.file_config["processed_data_path"] , 
-                             self.file_config["processed_data_file_save_name"])
+            save_path = Path(
+                self.file_config["data_dir_path"],
+                self.file_config["processed_data_path"],
+                self.file_config["processed_data_file_save_name"],
+            )
             data.to_csv(save_path)
             logger.info(f"Wrote data back out to {save_path}")
             ## Save as attribute to use externally

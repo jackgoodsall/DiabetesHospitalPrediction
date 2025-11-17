@@ -1,5 +1,5 @@
 file_information:
-  data_dir_path: "../data"
+  data_dir_path: "data"
   raw_data_path: "raw_data"
   processed_data_path: "processed_data"
   raw_data_file_name:  "diabetic_data.csv"
@@ -7,69 +7,113 @@ file_information:
 
 
 mlflow_information:
-  experiment_name: "data_engineering_1"
-  experiment_tag: "Basic data engineering"
+  experiment_name: "Diabetes binary classifcation"
+  experiment_tag: "Basic model training and basic data engineering"
 
 data:
   drop_columns:
-  - max_glu_serum,
-  - acetohexamide,
-  - tolbutamide,
-  - examide,
-  - citoglipton,
-  - glimepiride-pioglitazone,
-  - metformin-rosiglitazone,
-  - metformin-pioglitazone,
-  - encounter_id,
-  - patient_nbr,
-  - admission_type_id,
-  - discharge_disposition_id,
-  - admission_source_id,
+  - max_glu_serum
+  - acetohexamide
+  - tolbutamide
+  - examide
+  - citoglipton
+  - glimepiride-pioglitazone
+  - metformin-rosiglitazone
+  - metformin-pioglitazone
+  - encounter_id
+  - patient_nbr
+  - admission_type_id
+  - discharge_disposition_id
+  - admission_source_id
+
+
 
   target_column_name: readmitted
   target_to_binary: True
   numerical_columns:
-    time_in_hospital,
-    num_lab_procedures,
-    num_medications,
-    number_outpatient,
-    number_emergency,
-    number_diagnoses,
-    number_inpatient,
+    - time_in_hospital
+    - num_lab_procedures
+    - num_medications
+    - number_outpatient
+    - number_emergency
+    - number_diagnoses
+    - number_inpatient
   categorical_columns:
-    race,
-    gender,
-    age,
-    weight,
-    medical_specialty,
-    diag_1,
-    diag_2,
-    diag_3,
-    number_diagnoses,
-    A1Cresult,
-    metformin,
-    repaglinide,
-    nateglinide,
-    chlorpropamide,
-    glimepiride,
-    glipizide,
-    glyburide,
-    pioglitazone,
-    rosiglitazone,
-    acarbose,
-    miglitol,
-    troglitazone,
-    tolazamide,
-    insulin,
-    glyburide-metformin,
-    glipizide-metformin,
-    change,
-    diabetesMed,
-
+    - race
+    - gender
+    - age
+    - weight
+    - change
+    - glipizide-metformin
+    - glyburide-metformin
+    - medical_specialty
+    - diag_1
+    - diag_2
+    - diag_3
+    - A1Cresult
+    - metformin
+    - repaglinide
+    - nateglinide
+    - chlorpropamide
+    - glimepiride
+    - glipizide
+    - glyburide
+    - pioglitazone
+    - rosiglitazone
+    - acarbose
+    - miglitol
+    - troglitazone
+    - tolazamide
+    - insulin
+    - diabetesMed
+   
+data_engineering:
+  numerical_features:
+    - time_in_hospital
+    - num_lab_procedures
+    - num_medications
+    - number_outpatient
+    - number_emergency
+    - number_diagnoses
+    - number_inpatient
+  categorical_features:
+    - race
+    - gender
+    - age
+    - weight
+    - change
+    - glipizide-metformin
+    - glyburide-metformin
+    - medical_specialty
+    - diag_1
+    - diag_2
+    - diag_3
+    - A1Cresult
+    - metformin
+    - repaglinide
+    - nateglinide
+    - chlorpropamide
+    - glimepiride
+    - glipizide
+    - glyburide
+    - pioglitazone
+    - rosiglitazone
+    - acarbose
+    - miglitol
+    - troglitazone
+    - tolazamide
+    - insulin
+    - diabetesMed
+ 
+  numerical_imputer_strat: "mean"
+  categorical_imputer_strat: "most_frequent"
+  scaler: "standard"
+  remainder: "drop"
   
 model:
-  model_names: xgboost
-  
+  model_names: 
+    - xgboost
+    
 
 ## Configs for the models - for training uses the model defined above.
 logistic_regression:
@@ -77,4 +121,18 @@ logistic_regression:
 
 
 xgboost:
+  # Basic XGBoost parameters
+  objective: "binary:logistic"    
+  eval_metric: "logloss"          
+  booster: "gbtree"               
+  eta: 0.1                        
+  max_depth: 6                     
+  subsample: 0.8                  
+  colsample_bytree: 0.8           
+  min_child_weight: 1             
+  gamma: 0.1                      
+  lambda: 1                      
+  alpha: 0.1                        
+  n_estimators: 1000              
+  random_state: 42                    
 
