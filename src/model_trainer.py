@@ -107,20 +107,11 @@ class ModelTrainer:
         X_train, y_train = train.drop(columns=target), train[target].to_numpy()
         X_test, y_test = test.drop(columns=target), test[target].to_numpy()
         self._data_transformation_pipeline.fit(X_train)
-        ohe = self._data_transformation_pipeline._pipeline.named_transformers_[
-            "cat pipeline"
-        ].named_steps["one_hot"]
-        print(
-            ohe.get_feature_names_out(
-                self._data_transformation_pipeline._pipeline.named_transformers_[
-                    "cat pipeline"
-                ].feature_names_in_
-            )
-        )
+
+
         X_train = self._data_transformation_pipeline.transform(X_train).to_numpy()
         X_test = self._data_transformation_pipeline.transform(X_test).to_numpy()
 
-        print(sum(y_test))
 
         ### Get a list of models to train from the config, if only one convert to list
         logger.info("Getting models from config")
