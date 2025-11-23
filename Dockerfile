@@ -9,4 +9,4 @@ RUN uv sync --locked
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["uv", "run", "python", "-m", "my_app"]
+CMD ["uv", "run", "python", "src/model_trainer.py"]

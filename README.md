@@ -9,3 +9,11 @@ Uses logging and mlflow for debugging and experiment tracking respectively.
 
 This project is not about getting the highest performance for the specific task and more about implementing and using best MLOPs practices, and in theory this project can be easily changed for any other tasks by modifing the correct internal components for that specific task (the scaling, imputers, feature pipelines, models, metrics, etc).
 
+## How to use
+
+To run model training pipeline define what models you want to train inside the config and the parameters with which you wish to train them. 
+
+
+## Docker image
+
+This project can be run in a docker image using the contained docker container - you just need to build it.
