@@ -24,23 +24,6 @@ logger = logging.getLogger(__name__)
 CONFIG_PATH = "configs/run_config.yaml"
 
 
-class ModelTrainingConfig(BaseModel):
-    ## Basic overhead schema for the data_engineering_config
-    model_config = ConfigDict(extra="allow")
-
-    model: Dict[str, Any]
-    mlflow_information: Dict[str, Any]
-    data: Dict[str, Any]
-
-
-def load_yaml_config() -> ModelTrainingConfig:
-    ### Loads the different yaml configs
-    with open(CONFIG_PATH, "r") as f:
-        config = yaml.safe_load(f)
-    try:
-        return ModelTrainingConfig(**config)
-    except ValidationError as e:
-        raise ValueError(f"Configuration missing required sections:\n{e}")
 
 
 class ModelTrainer:
@@ -104,13 +87,3 @@ class ModelTrainer:
         # Note: We are returning the model, not saving or logging it here.
         return self._train_model_cv(model, X_train, y_train)
 
-if __name__ == "__main__":
-    """ logging.basicConfig(
-    level=logging.DEBUG,  # show everything DEBUG and up
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    ) """
-
-    config_object = load_yaml_config()
-    with mlflow.start_run(run_name="a"):
-        model_trainer = ModelTrainer(config_object)
-        model_trainer.run_pipeline()
