@@ -45,140 +45,64 @@ def load_yaml_config() -> ModelTrainingConfig:
 
 class ModelTrainer:
     """
-    Class for training a model, runs the full pipeline from data ingestion, data cleaning, 
-    feature engineering, scaling and splitting. 
+    Specialized class for training a single model using Cross-Validation (CV)
+    and calculating OOF (Out-Of-Fold) predictions and metrics.
 
-    Initalisation takes in config defined by the ModelTrainingConfig class defined above.
-
-    Has one helper function for training the model using a CV split.
-
-    Has one function to run the whole pipeline.
+    Does NOT handle data loading, feature engineering, or MLflow logging.
     """
-    def __init__(self, config):
-        self.config: ModelTrainingConfig = config
 
-    def _train_model(self, model, X, y, splitter):
+    def __init__(self, seed: int):
+        """Initializes the trainer with a fixed seed for reproducibility."""
+        self.seed = seed
+        logger.debug(f"ModelTrainer initialized with seed: {self.seed}")
+
+    def _train_model_cv(self, model, X: np.ndarray, y: np.ndarray):
         """
-        Internal helper function to train a model on data X, y using the
-        splitter. Trains model on hold out splits with predictions done on the
-        OOF predictions, retrains and returns model train on whole dataset.
-
-        Has implemented sklearn and XGBoost classfier API calls. Anything else
-        needs manual implemention/adding
+        Internal helper function to train a model on data X, y using CV splits.
+        Calculates OOF metrics and returns the model refit on the whole dataset.
         """
-
+        
+        # 1. Prepare Splitter
+        splitter = cross_validation_splits(
+            X, return_indices=True, random_state=self.seed
+        )
         oof_predictions = np.zeros(len(y))
 
-        for train_idx, val_idx in splitter:
-            (X_train, y_train, X_val, y_val) = (
-                X[train_idx],
-                y[train_idx],
-                X[val_idx],
-                y[val_idx],
-            )
+        # 2. Run Cross-Validation Loop
+        for fold, (train_idx, val_idx) in enumerate(splitter):
+            logger.debug(f"Training Fold {fold + 1}")
+            
+            # Prepare data for this fold
+            X_train, y_train = X[train_idx], y[train_idx]
+            X_val, y_val = X[val_idx], y[val_idx]
+            
+            # Check for standard fit method (for sklearn/XGBoost compatibility)
             if hasattr(model, "fit"):
                 model.fit(X_train, y_train)
+                # Predict probability (assuming binary classification)
                 oof_predictions[val_idx] = model.predict_proba(X_val)[:, 1]
+
+        # 3. Calculate OOF Metrics
         oof_metrics = binary_classifcation_report(y, oof_predictions)
-        ## Refit model on whole training data
+        logger.info(f"OOF Metrics calculated: {oof_metrics}")
+        
+        # 4. Refit model on whole training data (for final production model)
+        logger.info("Refitting final model on full training set.")
         model.fit(X, y)
-        return model, oof_metrics
+        
+        return model, oof_metrics, oof_predictions # Return predictions too for logging
 
-    def run_pipeline(self):
-        '''
-        Run the model training pipeline 
-        '''
-        # Set mlflow experiment
-        experiment_name = self.config.mlflow_information["experiment_name"]
-        experiment_tag = self.config.mlflow_information["experiment_tag"]
-        mlflow.set_experiment(
-            experiment_name=f"{experiment_name}{datetime.now():%Y%m%d_%H%M%S}"
-        )
-
-        ## Running data pipelines
-        logger.info("Initiating pipeline")
-        logger.info("Running Data input pipeline")
-        self._data_input_pipeline = DataInputCleaningPipeLine()
-        logger.info(
-            "Data input pipeline initiation finished,"
-            "data engineering pipeline initiation starting to run."
-        )
-        self._data_transformation_pipeline = DataEngineeringPipeLine(
-            DataEngineeringConfig(**self.config.model_extra["data_engineering"])
-        )
-        logger.info("Data engineering pipeline initation finished.")
-
-
-        ## Seeding and logging seed for reproducibility
-        seed = np.random.randint(0, 2**32 - 1)
-        logger.info(f"Generated random seed for this run as {seed}")
-        np.random.seed(seed)
-
-        ## Run data input pipeline
-        logger.info("Running Pipeline")
-        self._data_input_pipeline.run_pipeline()
-        logger.info("Splitting data")
-        target = self.config.data["target_column_name"]
-        # Split the dataframe into a train and test split
-        train, test = split_df(
-            self._data_input_pipeline.data, test_size=0.2, target=target
-        )
-        logger.info("Transforming data")
-        # Prepare data into numpy arrays
-        X_train, y_train = train.drop(columns=target), train[target].to_numpy()
-        X_test, y_test = test.drop(columns=target), test[target].to_numpy()
-        ## Fit the data transformation pipelines on training data
-        self._data_transformation_pipeline.fit(X_train)
-
-        # Transform train and test data
-        X_train = self._data_transformation_pipeline.transform(X_train).to_numpy()
-        X_test = self._data_transformation_pipeline.transform(X_test).to_numpy()
-
-        ### Get a list of models to train from the config, if only one convert to list
-        logger.info("Getting models from config")
-        self.models = []
-        model_names = self.config.model["model_names"]
-        if isinstance(model_names, str):
-            model_names = [model_names]
-
-        ## Start mlflow run for training models
-        logger.info("Starting mlflow run and training models")
-        nested = True if mlflow.active_run() else False
-        with mlflow.start_run(run_name="Model Training", nested=nested):
-            for model_name in model_names:
-                # Get configs
-                logger.info(f"Training model {model_name}")
-                estimator_configs = self.config.model_extra.get(model_name, {})
-                estimator_configs = (
-                    estimator_configs if estimator_configs is not None else {}
-                )
-                # Build model
-                current_model = build_estimator(model_name, **estimator_configs)
-                mlflow.log_params(estimator_configs)
-                # train model
-                current_model, oof_predictions = self._train_model(
-                    current_model,
-                    X_train,
-                    y_train,
-                    cross_validation_splits(
-                        X_train, return_indices=True, random_state=seed
-                    ),
-                )
-                # Log the model using mlflow
-                mlflow.xgboost.log_model(current_model , "xgboostmodel")
-                logger.info(f"Training {model_name} was succesful!")
-                # Make report on test data
-                test_predictions = current_model.predict_proba(X_test)[:, 1]
-                test_metrics = binary_classifcation_report(y_test, test_predictions)
-                # Log and save model.
-                mlflow.log_metrics(test_metrics)
-                mlflow.log_metrics(oof_predictions)
-                if self.config.mlflow_information["save_model"]:
-                    save_dir = self.config.mlflow_information["save_dir"]
-                    save_path = Path(save_dir)
-                    save_path.mkdir(exist_ok = True)
-                    save_name = save_path / f"{model_name}_{datetime.now():%Y%m%d_%H%M%S}.joblib"
-                    joblib.dump(current_model, save_name)
+    def train_and_get_results(self, model, X_train: np.ndarray, y_train: np.ndarray):
+        """
+        Public method to run the training protocol.
+        
+        Returns:
+            - final_model: The model refit on all training data.
+            - oof_metrics: Dictionary of metrics from OOF predictions.
+            - oof_predictions: Array of OOF predictions.
+        """
+        # Note: We are returning the model, not saving or logging it here.
+        return self._train_model_cv(model, X_train, y_train)
 
 if __name__ == "__main__":
     """ logging.basicConfig(
