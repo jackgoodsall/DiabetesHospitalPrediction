@@ -24,14 +24,10 @@ logger = logging.getLogger(__name__)
 CONFIG_PATH = "configs/run_config.yaml"
 
 
-
-
 class ModelTrainer:
     """
     Specialized class for training a single model using Cross-Validation (CV)
     and calculating OOF (Out-Of-Fold) predictions and metrics.
-
-    Does NOT handle data loading, feature engineering, or MLflow logging.
     """
 
     def __init__(self, seed: int):
@@ -44,7 +40,7 @@ class ModelTrainer:
         Internal helper function to train a model on data X, y using CV splits.
         Calculates OOF metrics and returns the model refit on the whole dataset.
         """
-        
+
         # 1. Prepare Splitter
         splitter = cross_validation_splits(
             X, return_indices=True, random_state=self.seed
@@ -54,11 +50,11 @@ class ModelTrainer:
         # 2. Run Cross-Validation Loop
         for fold, (train_idx, val_idx) in enumerate(splitter):
             logger.debug(f"Training Fold {fold + 1}")
-            
+
             # Prepare data for this fold
             X_train, y_train = X[train_idx], y[train_idx]
             X_val, y_val = X[val_idx], y[val_idx]
-            
+
             # Check for standard fit method (for sklearn/XGBoost compatibility)
             if hasattr(model, "fit"):
                 model.fit(X_train, y_train)
@@ -68,22 +64,15 @@ class ModelTrainer:
         # 3. Calculate OOF Metrics
         oof_metrics = binary_classifcation_report(y, oof_predictions)
         logger.info(f"OOF Metrics calculated: {oof_metrics}")
-        
+
         # 4. Refit model on whole training data (for final production model)
         logger.info("Refitting final model on full training set.")
         model.fit(X, y)
-        
-        return model, oof_metrics, oof_predictions # Return predictions too for logging
+
+        return model, oof_metrics, oof_predictions  
 
     def train_and_get_results(self, model, X_train: np.ndarray, y_train: np.ndarray):
         """
         Public method to run the training protocol.
-        
-        Returns:
-            - final_model: The model refit on all training data.
-            - oof_metrics: Dictionary of metrics from OOF predictions.
-            - oof_predictions: Array of OOF predictions.
         """
-        # Note: We are returning the model, not saving or logging it here.
         return self._train_model_cv(model, X_train, y_train)
-

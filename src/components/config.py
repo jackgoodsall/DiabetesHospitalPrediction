@@ -15,7 +15,7 @@ class ModelTrainingConfig(BaseModel):
     data: Dict[str, Any]
 
 
-def load_yaml_config(config_path)  -> ModelTrainingConfig:
+def load_yaml_config(config_path) -> ModelTrainingConfig:
     ### Loads the different yaml configs
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
@@ -23,7 +23,7 @@ def load_yaml_config(config_path)  -> ModelTrainingConfig:
         return ModelTrainingConfig(**config)
     except ValidationError as e:
         raise ValueError(f"Configuration missing required sections:\n{e}")
-    
+
 
 # Define engineering config options
 NumericalImputer = Literal["mean", "median", "most_frequent", "constant"]

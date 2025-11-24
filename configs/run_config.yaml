@@ -7,9 +7,12 @@ file_information:
 
 
 mlflow_information:
-  experiment_name: "Diabetes binary classifcation"
+  experiment_name: "XGboost Experiments"
   experiment_tag: "Basic model training and basic data engineering"
 
+
+  save_model: True
+  save_dir: "artefacts/models"
 data:
   drop_columns:
   - max_glu_serum

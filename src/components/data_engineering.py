@@ -14,8 +14,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 from .config import DataEngineeringConfig
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 
 class DataEngineeringPipeLine:
@@ -39,7 +39,7 @@ class DataEngineeringPipeLine:
     def _build_numerical_pipeline(self) -> None:
         if self.config.scaler == "standard":
             scaler = StandardScaler()
-        else:  # "minmax"
+        else: 
             scaler = MinMaxScaler()
 
         numerical_pipeline = Pipeline(
