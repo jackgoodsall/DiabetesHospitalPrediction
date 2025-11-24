@@ -13,6 +13,14 @@ This project is not about getting the highest performance for the specific task 
 
 To run model training pipeline define what models you want to train inside the config and the parameters with which you wish to train them. 
 
+The whole pipeline from data ingestion to data engineering to model building and evaluaiton can be run using the pipeline_runner.py file - which comes with automatic verbose logging.
+
+Components:
+    * Data ingestion - loads the data and some basic transformations like dropping columns and changing target to a binary target. 
+    * Data engineering - defines the data engineering pipeline for numerical columns, categorical columns and a unified one. 
+    * Model trainer - trains a model and evaluates based on a cv split from components - more can be added if required. 
+    * Pipeline_runner - runs the whole pipeline
+
 
 ## Docker image
 
