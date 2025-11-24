@@ -19,11 +19,11 @@ Components:
 
 * Data ingestion - loads the data and some basic transformations like dropping columns and changing target to a binary target. 
 
-*Data engineering - defines the data engineering pipeline for numerical columns, categorical columns and a unified one. 
+* Data engineering - defines the data engineering pipeline for numerical columns, categorical columns and a unified one. 
 
-*Model trainer - trains a model and evaluates based on a cv split from components - more can be added if required. 
+* Model trainer - trains a model and evaluates based on a cv split from components - more can be added if required. 
 
-*Pipeline_runner - runs the whole pipeline
+* Pipeline_runner - runs the whole pipeline
 
 
 ## Docker image

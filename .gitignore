@@ -4,3 +4,5 @@ mlruns/
 .ruff_cache/
 models/
 __pycache__/
+/artefacts
+/.venv
