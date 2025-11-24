@@ -13,28 +13,9 @@ from sklearn.exceptions import NotFittedError
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
-
+from .config import DataEngineeringConfig
 logger = logging.getLogger(__name__)
 
-NumericalImputer = Literal["mean", "median", "most_frequent", "constant"]
-CategoricalImputer = Literal["most_frequent", "constant"]
-ScalerType = Literal["standard", "minmax"]
-
-
-@dataclass(frozen=True)
-class DataEngineeringConfig:
-    numerical_features: List[str]
-    categorical_features: List[str]
-    numerical_imputer_strat: NumericalImputer
-    categorical_imputer_strat: CategoricalImputer
-    scaler: ScalerType
-    remainder: Literal["drop", "passthrough"]
-
-    def validate_schema(self, df: pd.DataFrame) -> None:
-        combined_features = set(self.numerical_features + self.categorical_features)
-        dataframe_features = set(df.columns)
-        if not combined_features <= dataframe_features:
-            raise ValueError("Not all features are in the dataframe")
 
 
 class DataEngineeringPipeLine:
