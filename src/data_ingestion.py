@@ -12,7 +12,7 @@ from pydantic import BaseModel, ValidationError, ConfigDict
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import abc
 
-from .components.config import DataInputCleaningPipeLineConfig
+from components.config import DataInputCleaningPipeLineConfig
 
 logger = logging.getLogger(__name__)
 
