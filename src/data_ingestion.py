@@ -10,53 +10,56 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel, ValidationError, ConfigDict
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+import abc
+
+from .components.config import DataInputCleaningPipeLineConfig
 
 logger = logging.getLogger(__name__)
 
 
-class DataInputCleaningPipeLineConfig(BaseModel):
-    ## Basic overhead schema for the data_engineering_config
-    model_config = ConfigDict(extra="allow")
-
-    file_information: Dict[str, Any]
-    mlflow_information: Dict[str, Any]
-    data: Dict[str, Any]
-
-
-def load_yaml_config() -> DataInputCleaningPipeLineConfig:
-    ### Loads the different yaml configs
-    config_path = "configs/"
-    data_engineering_config = "run_config.yaml"
-    with open(os.path.join(config_path + data_engineering_config), "r") as f:
-        config = yaml.safe_load(f)
-    try:
-        return DataInputCleaningPipeLineConfig(**config)
-    except ValidationError as e:
-        raise ValueError(f"Configuration missing required sections:\n{e}")
-
-
-class DataInputCleaningPipeLine:
+class DataInputCleaningPipeline(abc.ABC):
     """
-    Class for a Data input and cleaning pipeline, integrated with logging and
-    mlflow.
+    Abstract META class for the input and cleaning pipeline portion.
+
+    Provides required functionality that needs to be implemented for this pipeline.
     """
 
-    def __init__(self, config=None):
-        if config is None:
-            logger.info("No config provided attempting to load config")
-            try:
-                configs = load_yaml_config()
-                self.file_config = configs.file_information
-                self.mlflow_config = configs.mlflow_information
-                self.data_config = configs.data
-                self.safe_to_run = True
-                logger.info("Configuration loading succesful")
-            except ValidationError as e:
-                logger.warning(f"Config loading failed error message {e}")
-                self.safe_to_run = False
-        else:
-            logger.info("Config passed, using this as config")
-            self.config = config
+    @abc.abstractmethod
+    def run_pipeline(self):
+        raise NotImplementedError()
+
+
+    @abc.abstractmethod
+    def _load_data(self):
+        raise NotImplementedError()
+
+
+class BinaryReadmissionInputCleaningPipeline(DataInputCleaningPipeline):
+    """
+    Class for the data input and cleaning portion of the pipeline for the binary 
+    classification task defined in the readme.
+
+    
+    """
+
+    ## defines a mapping from backend to data loading process
+    ## in this class
+    __data_loading_mapping__ = {
+        "pandas" : "load_data_to_pandas"
+        }
+
+    def __init__(self, config: DataInputCleaningPipeLineConfig):
+        if type(config) != DataInputCleaningPipeLineConfig:
+            raise TypeError()
+
+        self.file_config = config.file_information or None
+        self.mlflow_config = config.mlflow_information or None
+        self.data_config = config.data or None
+
+        self._back_end = self.data_config.get("back_end", "pandas").strip().lower()
+
+        logger.info("Input and Cleaning pipeline module loaded")
+        self.safe_to_run = True
 
     def load_data_to_pandas(self) -> pd.DataFrame:
         ### Loads data from file into a pandas dataframe
@@ -82,43 +85,54 @@ class DataInputCleaningPipeLine:
         data[target] = data[target].map(mapping)
         return data
 
-    def remove_columns(self, data: pd.DataFrame) -> pd.DataFrame:
+    def remove_columns(self, data: pd.DataFrame, use_mlflow_logging = False) -> pd.DataFrame:
         columns_to_drop = self.data_config["drop_columns"]
-        mlflow.log_param("dropped columns", columns_to_drop)
+        if use_mlflow_logging:
+            mlflow.log_param("dropped columns", columns_to_drop)
         return data.drop(columns=columns_to_drop)
 
+    def _load_data(self):
+        method_name = self.__data_loading_mapping__.get(
+            self._back_end
+        )
+        method = getattr(self, method_name)
+        data = method()
+        return data
+
+    def _save_data_artefact(self, data, save_path):
+        if self._back_end == "pandas":
+            data.to_csv(save_path)
+     
     def run_pipeline(self):
-        if mlflow.active_run() is not None:
-            logger.info("Detected higher level run, starting nested run")
-            run_ctx = mlflow.start_run(
-                run_name="data engineering pipeline", nested=True
-            )
-        else:
-            experiment_name = self.mlflow_config.get("experiment_name", "")
-            logger.info(f"No higher level run detected, starting new run with name ")
-            mlflow.set_experiment(experiment_name)
-        with run_ctx as run:
-            if not self.safe_to_run:
-                logger.info("Failed to start pipeline")
+        ## Checks if mlflow logging to check if should use mlflow logging
+        use_mlflow_logging = mlflow.active_run() is not None 
+        if use_mlflow_logging:
+            logger.info("Detected higher level run, will use mlflow logging aswell")
+  
+        if not self.safe_to_run:
+            logger.info("Failed to start pipeline")
 
-            try:
-                data = self.load_data_to_pandas()
-            except FileNotFoundError as e:
-                logger.warning(f"File not found error {e}")
-                raise FileNotFoundError(f"Could not find {self.file_path}")
+        try:
+            data = self._load_data()
+        except FileNotFoundError as e:
+            logger.warning(f"File not found error {e}")
+            raise FileNotFoundError(f"Could not find {self.file_path}")
 
-            if self.data_config["target_to_binary"]:
-                logger.info("Transforming target to binary class")
-                data = self.transform_target_to_binary(data)
-            logger.info("Removing unneeded columns defined in config")
-            data = self.remove_columns(data)
-            logger.info("Removed columns from the dataframe defined in the config")
+
+        logger.info("Transforming target to binary class")
+        data = self.transform_target_to_binary(data)
+
+        logger.info("Removing unneeded columns defined in config")
+        data = self.remove_columns(data, use_mlflow_logging)
+
+        logger.info("Removed columns from the dataframe defined in the config")
+        if self.file_config.get("save_cleaned_data", False):
             save_path = Path(
                 self.file_config["data_dir_path"],
                 self.file_config["processed_data_path"],
                 self.file_config["processed_data_file_save_name"],
             )
-            data.to_csv(save_path)
+            self._save_data_artefact(data, save_path)
             logger.info(f"Wrote data back out to {save_path}")
-            ## Save as attribute to use externally
-            self.data = data
+        
+        return data
