@@ -10,8 +10,9 @@ from components.config import (
     load_yaml_config,
     ModelTrainingConfig,
     DataEngineeringConfig,
+    DataInputCleaningPipeLineConfig
 )
-from data_ingestion import DataInputCleaningPipeLine
+from data_ingestion import BinaryReadmissionInputCleaningPipeline
 from components.data_engineering import DataEngineeringPipeLine
 from components.training_splits import split_df
 from components.model_evaluation import binary_classifcation_report

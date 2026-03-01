@@ -4,7 +4,7 @@ file_information:
   processed_data_path: "processed_data"
   raw_data_file_name:  "diabetic_data.csv"
   processed_data_file_save_name:  "processed_data.csv"
-
+  save_cleaned_data: True
 
 mlflow_information:
   experiment_name: "XGboost Experiments"
@@ -13,7 +13,12 @@ mlflow_information:
 
   save_model: True
   save_dir: "artefacts/models"
+
+
 data:
+
+  back_end: pandas
+
   drop_columns:
   - max_glu_serum
   - acetohexamide
@@ -32,7 +37,6 @@ data:
 
 
   target_column_name: readmitted
-  target_to_binary: True
   numerical_columns:
     - time_in_hospital
     - num_lab_procedures

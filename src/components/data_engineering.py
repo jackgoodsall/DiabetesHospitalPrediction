@@ -13,7 +13,7 @@ from sklearn.exceptions import NotFittedError
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
-from .config import DataEngineeringConfig
+from components.config import DataEngineeringConfig
 
 logger = logging.getLogger(__name__)
 

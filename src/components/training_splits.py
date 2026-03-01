@@ -35,7 +35,7 @@ def cross_validation_splits(
     Yield CV splits as (train_idx, val_idx) or (train_df, val_df) depending
     on whether return_indices is true or not.
 
-    2 Differnet stratergies available - kfold and stratified kfold.
+    1  available - kfold.
     """
     if stratergy not in {"kfold", "stratified"}:
         raise ValueError(f"Unknown stratergy {stratergy}")
@@ -50,15 +50,4 @@ def cross_validation_splits(
                 yield tr_idx, val_idx
             else:
                 yield X[tr_idx], X[val_idx]
-    """  # Stratified k fold
-    if stratergy == "stratified":
-        assert target is not None ; "Target must not be none"
-        y = df[target].to_nummpy()
-        splitter = StratifiedKFold(n_splits, shuffle = shuffle, random_state= random_state)
-        for tr_idx, val_idx in splitter.split(idx, y):
-            if return_indices:
-                yield tr_idx, val_idx
-            else:
-                yield df.iloc[tr_idx], df.iloc[val_idx]
 
- """

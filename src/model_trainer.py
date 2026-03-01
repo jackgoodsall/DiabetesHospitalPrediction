@@ -1,7 +1,6 @@
 from components.training_splits import split_df, cross_validation_splits
 from components.model_evaluation import binary_classifcation_report
 from model_builder import build_estimator
-from data_ingestion import DataInputCleaningPipeLine
 from components.data_engineering import DataEngineeringPipeLine, DataEngineeringConfig
 
 from typing import Dict, Any
