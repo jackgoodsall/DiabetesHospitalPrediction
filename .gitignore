@@ -6,3 +6,5 @@ models/
 __pycache__/
 /artefacts
 /.venv
+/.pytest_cache
+/diabetes

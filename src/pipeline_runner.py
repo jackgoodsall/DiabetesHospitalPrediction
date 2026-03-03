@@ -5,6 +5,8 @@ import joblib
 from pathlib import Path
 from datetime import datetime
 
+from xgboost import XGBClassifier
+
 # Import all necessary components
 from components.config import (
     load_yaml_config,
@@ -17,7 +19,7 @@ from components.data_engineering import DataEngineeringPipeLine
 from components.training_splits import split_df
 from components.model_evaluation import binary_classifcation_report
 from model_builder import build_estimator
-from model_trainer import ModelTrainer  # <-- Use the new, focused trainer
+from model_trainer import ModelTrainer  
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +37,11 @@ def run_ml_pipeline():
     """
     try:
         # --- 0. Configuration and Global Setup ---
-        config: ModelTrainingConfig = load_yaml_config(CONFIG_PATH)
+        config: ModelTrainingConfig = load_yaml_config(CONFIG_PATH, ModelTrainingConfig)
 
-        seed = np.random.randint(0, 2**32 - 1)
+        data_cleaning_config: DataInputCleaningPipeLineConfig = load_yaml_config(CONFIG_PATH, DataInputCleaningPipeLineConfig)
+
+        seed = np.random.randint(0, 2**16 - 1)
         np.random.seed(seed)
         logger.info(f"Generated random seed for this run as {seed}")
 
@@ -54,12 +58,12 @@ def run_ml_pipeline():
 
             # --- 1. Data Ingestion, Splitting, and Feature Engineering ---
             logger.info("Stage 1: Data Ingestion and Preparation")
-            data_input_pipeline = DataInputCleaningPipeLine()
-            data_input_pipeline.run_pipeline()
+            data_input_pipeline = BinaryReadmissionInputCleaningPipeline(data_cleaning_config)
+            data = data_input_pipeline.run_pipeline()
 
             target = config.data["target_column_name"]
             train_df, test_df = split_df(
-                data_input_pipeline.data, test_size=0.2, target=target
+                data, test_size=0.2, target=target
             )
 
             X_train, y_train = (
@@ -121,25 +125,34 @@ def run_ml_pipeline():
                     # 1. Log the Transformer
 
                     transformer_path = Path("artefacts/pipeline")
-                    transformer_path.mkdir(exist_ok=True)
+                    transformer_path.mkdir(parents=True, exist_ok=True)
                     transformer_path = (
-                        transformer_path / "{model_name}_transformer.joblib"
+                        transformer_path / f"{model_name}_transformer.joblib"
                     )
                     joblib.dump(data_transformer, transformer_path)
                     mlflow.log_artifact(transformer_path, artifact_path="preprocessor")
 
                     # 2. Log the Model
-                    # Probability a better way to log models depending on their
+                    # Prob a better way to log models depending on their
                     # inferance signiture but this will do for now.
-                    try:
-                        mlflow.xgboost.log_model(final_trained_model, "model")
-                    except AttributeError:
-                        mlflow.sklearn.log_model(final_trained_model, "model")
+
+                    if isinstance(final_trained_model, XGBClassifier):
+                        mlflow.xgboost.log_model(
+                            final_trained_model,
+                            "model",
+                            registered_model_name=model_name,
+                        )
+                    else:
+                        mlflow.sklearn.log_model(
+                            final_trained_model,
+                            "model",
+                            registered_model_name=model_name,
+                        )
 
                     # 3. Local Saving
                     if config.mlflow_information.get("save_model"):
                         save_dir = Path(config.mlflow_information["save_dir"])
-                        save_dir.mkdir(exist_ok=True)
+                        save_dir.mkdir(exist_ok=True, parents = True)
                         save_name = (
                             save_dir
                             / f"{model_name}_{datetime.now():%Y%m%d_%H%M%S}.joblib"
