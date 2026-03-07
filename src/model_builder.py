@@ -1,14 +1,18 @@
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, ExtraTreesClassifier
 from xgboost import XGBClassifier
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
 
 
 __MODELS__ = {
-
-    "logistic_regression" : LogisticRegression,
-    "random_forest" : RandomForestClassifier,
-    "xgboost"  : XGBClassifier
- 
+    "logistic_regression": LogisticRegression,
+    "random_forest": RandomForestClassifier,
+    "xgboost": XGBClassifier,
+    "catboost": CatBoostClassifier,
+    "lightgbm": LGBMClassifier,
+    "gradient_boosting": GradientBoostingClassifier,
+    "extra_trees": ExtraTreesClassifier,
 }
 
 def build_estimator(name: str, **model_configs):

@@ -6,6 +6,8 @@ from pathlib import Path
 from datetime import datetime
 
 from xgboost import XGBClassifier
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
 
 # Import all necessary components
 from components.config import (
@@ -138,6 +140,18 @@ def run_ml_pipeline():
 
                     if isinstance(final_trained_model, XGBClassifier):
                         mlflow.xgboost.log_model(
+                            final_trained_model,
+                            "model",
+                            registered_model_name=model_name,
+                        )
+                    elif isinstance(final_trained_model, CatBoostClassifier):
+                        mlflow.catboost.log_model(
+                            final_trained_model,
+                            "model",
+                            registered_model_name=model_name,
+                        )
+                    elif isinstance(final_trained_model, LGBMClassifier):
+                        mlflow.lightgbm.log_model(
                             final_trained_model,
                             "model",
                             registered_model_name=model_name,
