@@ -1,4 +1,13 @@
 .venv/
-diabetes/
+.git/
+.github/
+.pytest_cache/
 __pycache__/
+mlruns/
+artefacts/
+data/
+notebooks/
+tests/
+dist/
 .env
+*.md

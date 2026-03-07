@@ -1,12 +1,17 @@
-FROM python:3.12-slim-bookworm AS app
+FROM python:3.12-slim-bookworm
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 WORKDIR /app
-ADD . /app
 
-RUN uv sync --locked
+# Copy dependency files first so this layer is cached unless deps change
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
+
+# Copy source after deps are installed
+COPY configs/ ./configs/
+COPY src/ ./src/
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["uv", "run", "python", "src/model_trainer.py"]
+CMD ["uv", "run", "python", "src/pipeline_runner.py"]
