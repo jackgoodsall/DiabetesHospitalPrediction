@@ -31,7 +31,6 @@ The primary goal is demonstrating **production-grade ML engineering practices** 
 | ML / Data | scikit-learn, XGBoost, pandas, NumPy |
 | Experiment tracking | MLflow (tracking + model registry) |
 | Config & validation | Pydantic v2, PyYAML |
-| API / Serving | FastAPI, uvicorn |
 | Testing | pytest |
 | Packaging | uv, pyproject.toml |
 | Containerisation | Docker |
@@ -59,7 +58,7 @@ DiabetesHospitalPrediction/
 │   │   ├── model_evaluation.py  # Metrics and classification report
 │   │   └── training_splits.py   # Stratified train/test split
 │   ├── data_ingestion.py        # Raw data loading and cleaning
-│   ├── model_builder.py         # Estimator factory (XGBoost, RF, LR)
+│   ├── model_builder.py         # Estimator factory (XGBoost, LightGBM, CatBoost, RF, LR, etc.)
 │   ├── model_trainer.py         # Cross-validated training with OOF metrics
 │   ├── pipeline_runner.py       # Orchestrates the full pipeline
 │   └── inference.py             # CLI inference against registry or local files
