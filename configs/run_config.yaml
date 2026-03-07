@@ -124,7 +124,61 @@ model:
 
 ## Configs for the models - for training uses the model defined above.
 logistic_regression:
-  list_configs
+  C: 1.0
+  max_iter: 1000
+  solver: lbfgs
+  random_state: 42
+  n_jobs: -1
+
+
+random_forest:
+  n_estimators: 300
+  max_depth: null
+  min_samples_split: 2
+  random_state: 42
+  n_jobs: -1
+
+
+extra_trees:
+  n_estimators: 300
+  max_depth: null
+  min_samples_split: 2
+  random_state: 42
+  n_jobs: -1
+
+
+gradient_boosting:
+  n_estimators: 200
+  learning_rate: 0.1
+  max_depth: 4
+  subsample: 0.8
+  min_samples_split: 20
+  random_state: 42
+
+
+catboost:
+  iterations: 1000
+  learning_rate: 0.05
+  depth: 6
+  l2_leaf_reg: 3
+  loss_function: Logloss
+  eval_metric: AUC
+  random_seed: 42
+  verbose: 0
+
+
+lightgbm:
+  n_estimators: 1000
+  learning_rate: 0.05
+  num_leaves: 31
+  max_depth: -1
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_samples: 20
+  reg_alpha: 0.1
+  reg_lambda: 1.0
+  random_state: 42
+  verbose: -1
 
 
 xgboost:
