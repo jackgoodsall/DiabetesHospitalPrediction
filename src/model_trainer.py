@@ -29,20 +29,31 @@ class ModelTrainer:
     and calculating OOF (Out-Of-Fold) predictions and metrics.
     """
 
-    def __init__(self, seed: int):
+    def __init__(self, seed: int, n_splits: int = 5):
         """Initializes the trainer with a fixed seed for reproducibility."""
         self.seed = seed
+        self.n_splits = n_splits
         logger.debug(f"ModelTrainer initialized with seed: {self.seed}")
 
-    def _train_model_cv(self, model, X: np.ndarray, y: np.ndarray):
+    def _train_model_cv(self, model, X: np.ndarray, y: np.ndarray, groups: np.ndarray = None):
         """
         Internal helper function to train a model on data X, y using CV splits.
         Calculates OOF metrics and returns the model refit on the whole dataset.
+
+        When ``groups`` is provided, folds are both stratified and group-aware
+        (no group spans train and validation); otherwise folds are stratified.
         """
 
-        # 1. Prepare Splitter
+        # 1. Prepare Splitter (stratified — and group-aware when groups given)
+        stratergy = "stratified_group" if groups is not None else "stratified"
         splitter = cross_validation_splits(
-            X, return_indices=True, random_state=self.seed
+            X,
+            y=y,
+            groups=groups,
+            n_splits=self.n_splits,
+            stratergy=stratergy,
+            return_indices=True,
+            random_state=self.seed,
         )
         oof_predictions = np.zeros(len(y))
 
@@ -70,8 +81,10 @@ class ModelTrainer:
 
         return model, oof_metrics, oof_predictions  
 
-    def train_and_get_results(self, model, X_train: np.ndarray, y_train: np.ndarray):
+    def train_and_get_results(
+        self, model, X_train: np.ndarray, y_train: np.ndarray, groups: np.ndarray = None
+    ):
         """
         Public method to run the training protocol.
         """
-        return self._train_model_cv(model, X_train, y_train)
+        return self._train_model_cv(model, X_train, y_train, groups)
