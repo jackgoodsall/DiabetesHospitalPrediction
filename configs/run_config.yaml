@@ -36,6 +36,7 @@ data:
 
 
 
+  validate: true
   target_column_name: readmitted
   numerical_columns:
     - time_in_hospital
