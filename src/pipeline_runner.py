@@ -64,15 +64,56 @@ def run_ml_pipeline():
             data = data_input_pipeline.run_pipeline()
 
             target = config.data["target_column_name"]
-            train_df, test_df = split_df(
-                data, test_size=0.2, target=target
+
+            # Split configuration. group_column (e.g. patient_nbr) makes the
+            # split leak-free: all encounters for one patient stay on the same
+            # side, so the model can't memorise patient-specific signal.
+            split_config = config.model_extra.get("split", {})
+            group_col = split_config.get("group_column")
+            test_size = split_config.get("test_size", 0.2)
+            stratify = split_config.get("stratify", True)
+            cv_folds = split_config.get("cv_folds", 5)
+
+            mlflow.log_params(
+                {
+                    "split_group_column": group_col,
+                    "split_test_size": test_size,
+                    "split_stratify": stratify,
+                    "cv_folds": cv_folds,
+                }
             )
 
+            train_df, test_df = split_df(
+                data,
+                target=target,
+                test_size=test_size,
+                stratify=stratify,
+                group_col=group_col,
+                random_state=seed,
+            )
+
+            # Extract the grouping column for leak-free CV, then drop it so it
+            # never leaks into the feature matrix.
+            groups_train = None
+            drop_for_features = [target]
+            if group_col and group_col in train_df.columns:
+                groups_train = train_df[group_col].to_numpy()
+                drop_for_features.append(group_col)
+                logger.info(
+                    f"Group-aware split on '{group_col}': "
+                    f"{train_df[group_col].nunique()} train / "
+                    f"{test_df[group_col].nunique()} test groups, "
+                    f"{len(train_df)} / {len(test_df)} rows"
+                )
+
             X_train, y_train = (
-                train_df.drop(columns=[target]),
+                train_df.drop(columns=drop_for_features),
                 train_df[target].to_numpy(),
             )
-            X_test, y_test = test_df.drop(columns=[target]), test_df[target].to_numpy()
+            X_test, y_test = (
+                test_df.drop(columns=drop_for_features),
+                test_df[target].to_numpy(),
+            )
 
             # --- 2. Feature Transformation ---
             logger.info("Stage 2: Fitting and Transforming Data")
@@ -88,7 +129,7 @@ def run_ml_pipeline():
             X_test_transformed = data_transformer.transform(X_test).to_numpy()
 
             # --- 3. Model Training Loop ---
-            trainer = ModelTrainer(seed=seed)
+            trainer = ModelTrainer(seed=seed, n_splits=cv_folds)
             model_names = (
                 config.model["model_names"]
                 if isinstance(config.model["model_names"], list)
@@ -108,7 +149,7 @@ def run_ml_pipeline():
                     # B. Train Model (via the specialist ModelTrainer)
                     final_trained_model, oof_metrics, oof_predictions = (
                         trainer.train_and_get_results(
-                            current_model, X_train_transformed, y_train
+                            current_model, X_train_transformed, y_train, groups=groups_train
                         )
                     )
 
