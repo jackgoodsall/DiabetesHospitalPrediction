@@ -14,4 +14,13 @@ COPY src/ ./src/
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["uv", "run", "python", "src/pipeline_runner.py"]
+# MODE=train  → run the training pipeline (default)
+# MODE=serve  → start the FastAPI prediction server
+ARG MODE=train
+ENV APP_MODE=${MODE}
+
+CMD if [ "$APP_MODE" = "serve" ]; then \
+        uvicorn src.api:app --host 0.0.0.0 --port 8000; \
+    else \
+        python src/pipeline_runner.py; \
+    fi

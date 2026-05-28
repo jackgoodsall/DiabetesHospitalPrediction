@@ -19,7 +19,8 @@ The primary goal is demonstrating **production-grade ML engineering practices** 
 - **MLflow experiment tracking** — every run logs parameters, metrics, the config file, the fitted transformer, and the trained model as artifacts; nested runs per model within a parent pipeline run
 - **MLflow Model Registry** — models are registered and promoted to stages (`Staging` / `Production`) for lifecycle management
 - **CLI inference script** — load from the registry or local `.joblib` files and score new patient records from the command line
-- **Dockerised** — reproducible environment via a self-contained Docker image
+- **REST API** — FastAPI service with `/health`, `/predict`, and `/predict/batch` endpoints; model loaded once at startup via lifespan, Pydantic-validated request/response schemas, interactive docs at `/docs`
+- **Dockerised** — reproducible environment for both training and serving via a single Docker image with a `MODE` build argument
 - **CI with GitHub Actions** — tests run on every push and pull request via `uv`
 
 ---
@@ -28,8 +29,9 @@ The primary goal is demonstrating **production-grade ML engineering practices** 
 
 | Area | Tools |
 |------|-------|
-| ML / Data | scikit-learn, XGBoost, pandas, NumPy |
+| ML / Data | scikit-learn, XGBoost, LightGBM, CatBoost, pandas, NumPy |
 | Experiment tracking | MLflow (tracking + model registry) |
+| Model serving | FastAPI, Uvicorn |
 | Config & validation | Pydantic v2, PyYAML |
 | Testing | pytest |
 | Packaging | uv, pyproject.toml |
@@ -61,7 +63,9 @@ DiabetesHospitalPrediction/
 │   ├── model_builder.py         # Estimator factory (XGBoost, LightGBM, CatBoost, RF, LR, etc.)
 │   ├── model_trainer.py         # Cross-validated training with OOF metrics
 │   ├── pipeline_runner.py       # Orchestrates the full pipeline
-│   └── inference.py             # CLI inference against registry or local files
+│   ├── inference.py             # CLI inference against registry or local files
+│   ├── api.py                   # FastAPI prediction service (health, predict, batch)
+│   └── schemas.py               # Pydantic request/response models for the API
 ├── artefacts/
 │   ├── models/                  # Saved .joblib model files
 │   └── pipeline/                # Saved transformer artifacts
@@ -101,6 +105,102 @@ configs/run_config.yaml
 ┌─────────────────────┐
 │  MLflow Artifacts   │  Config, transformer (.joblib), model → MLflow registry
 └─────────────────────┘
+```
+
+---
+
+## Model Serving API
+
+The trained model is exposed as a REST API built with FastAPI. The model and its preprocessing transformer are loaded from the MLflow registry once at server startup and reused for every request — avoiding the cost of deserialising a model file on every prediction.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Liveness check — returns model name, stage, and load status |
+| `POST` | `/predict` | Single-record prediction; returns probability and binary label |
+| `POST` | `/predict/batch` | Batch prediction; returns per-record results plus aggregate stats |
+
+All endpoints are self-documented at **`http://localhost:8000/docs`** (Swagger UI) once the server is running.
+
+### Run the API locally
+
+```bash
+# Requires a trained model promoted to Production in the MLflow registry
+uv run uvicorn src.api:app --reload --port 8000
+```
+
+### Example request
+
+```bash
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "time_in_hospital": 5,
+    "num_lab_procedures": 42,
+    "num_medications": 12,
+    "number_outpatient": 0,
+    "number_emergency": 1,
+    "number_diagnoses": 7,
+    "number_inpatient": 0,
+    "race": "Caucasian",
+    "gender": "Female",
+    "age": "[50-60)",
+    "weight": null,
+    "change": "Ch",
+    "diabetesMed": "Yes",
+    "metformin": "Steady",
+    "repaglinide": "No",
+    "nateglinide": "No",
+    "chlorpropamide": "No",
+    "glimepiride": "No",
+    "glipizide": "No",
+    "glyburide": "No",
+    "pioglitazone": "No",
+    "rosiglitazone": "No",
+    "acarbose": "No",
+    "miglitol": "No",
+    "troglitazone": "No",
+    "tolazamide": "No",
+    "insulin": "Up",
+    "glipizide-metformin": "No",
+    "glyburide-metformin": "No",
+    "medical_specialty": "InternalMedicine",
+    "diag_1": "250.01",
+    "diag_2": "401",
+    "diag_3": "272",
+    "A1Cresult": ">8"
+  }'
+```
+
+```json
+{
+  "readmission_probability": 0.623,
+  "readmitted": true,
+  "threshold_used": 0.5,
+  "model_name": "xgboost",
+  "model_stage": "Production"
+}
+```
+
+The `threshold` query parameter adjusts the decision boundary without redeployment — useful for tuning the precision/recall trade-off:
+
+```bash
+# Flag fewer patients (higher precision)
+POST /predict?threshold=0.7
+
+# Flag more patients (higher recall)
+POST /predict?threshold=0.3
+```
+
+### Load from local files instead of MLflow
+
+Set environment variables to bypass the registry entirely:
+
+```bash
+MODEL_PATH=artefacts/models/xgboost_20260303.joblib \
+TRANSFORMER_PATH=artefacts/pipeline/xgboost_transformer.joblib \
+uv run uvicorn src.api:app --port 8000
 ```
 
 ---
@@ -172,8 +272,14 @@ Navigate to `http://localhost:5000` to explore runs, compare metrics, and inspec
 ### Run with Docker
 
 ```bash
+# Train (default)
 docker build -t diabetes-prediction .
 docker run diabetes-prediction
+
+# Serve the prediction API
+docker build --build-arg MODE=serve -t diabetes-api .
+docker run -p 8000:8000 diabetes-api
+# API available at http://localhost:8000 — docs at http://localhost:8000/docs
 ```
 
 ### Run tests
