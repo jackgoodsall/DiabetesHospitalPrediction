@@ -11,8 +11,11 @@ import yaml
 from pydantic import BaseModel, ValidationError, ConfigDict
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import abc
+import pandera.pandas as pa
+import pandera.errors
 
 from components.config import DataInputCleaningPipeLineConfig
+from components.data_validation import CleanedDataSchema, RawDataSchema
 
 logger = logging.getLogger(__name__)
 
@@ -102,15 +105,30 @@ class BinaryReadmissionInputCleaningPipeline(DataInputCleaningPipeline):
     def _save_data_artefact(self, data, save_path):
         if self._back_end == "pandas":
             data.to_csv(save_path)
-     
+
+    def _validate(self, data: pd.DataFrame, schema: pa.DataFrameModel, stage: str) -> None:
+        """Validate a DataFrame against a Pandera schema; raise with context on failure."""
+        try:
+            schema.validate(data, lazy=True)
+            logger.info(f"Data validation passed ({stage})")
+        except pandera.errors.SchemaErrors as exc:
+            failure_summary = exc.failure_cases[["schema_context", "column", "check", "failure_case"]].to_string(index=False)
+            raise ValueError(
+                f"Data validation failed at stage '{stage}'.\n\n"
+                f"Failures:\n{failure_summary}\n\n"
+                f"Fix the input data or adjust the schema in src/components/data_validation.py."
+            ) from exc
+
     def run_pipeline(self):
         ## Checks if mlflow logging to check if should use mlflow logging
-        use_mlflow_logging = mlflow.active_run() is not None 
+        use_mlflow_logging = mlflow.active_run() is not None
         if use_mlflow_logging:
             logger.info("Detected higher level run, will use mlflow logging aswell")
-  
+
         if not self.safe_to_run:
             logger.info("Failed to start pipeline")
+
+        validate = self.data_config.get("validate", False)
 
         try:
             data = self._load_data()
@@ -118,12 +136,17 @@ class BinaryReadmissionInputCleaningPipeline(DataInputCleaningPipeline):
             logger.warning(f"File not found error {e}")
             raise FileNotFoundError(f"Could not find {self.file_path}")
 
+        if validate:
+            self._validate(data, RawDataSchema, "raw")
 
         logger.info("Transforming target to binary class")
         data = self.transform_target_to_binary(data)
 
         logger.info("Removing unneeded columns defined in config")
         data = self.remove_columns(data, use_mlflow_logging)
+
+        if validate:
+            self._validate(data, CleanedDataSchema, "cleaned")
 
         logger.info("Removed columns from the dataframe defined in the config")
         if self.file_config.get("save_cleaned_data", False):
@@ -134,5 +157,5 @@ class BinaryReadmissionInputCleaningPipeline(DataInputCleaningPipeline):
             )
             self._save_data_artefact(data, save_path)
             logger.info(f"Wrote data back out to {save_path}")
-        
+
         return data

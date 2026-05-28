@@ -32,6 +32,7 @@ import mlflow
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from mlflow import MlflowClient
 
 from schemas import (
@@ -159,6 +160,11 @@ def _check_model_loaded() -> None:
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/docs")
+
+
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 def health() -> HealthResponse:
     """Liveness and readiness check. Returns 200 when the model is loaded."""
