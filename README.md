@@ -17,6 +17,8 @@ The primary goal is demonstrating **production-grade ML engineering practices** 
 - **Config-driven** — all pipeline behaviour (features, models, hyperparameters, MLflow experiment name) is controlled via `configs/run_config.yaml`; no magic numbers in code
 - **Pydantic config validation** — configs are parsed into typed models at startup; misconfiguration raises a clear error before any data is touched
 - **MLflow experiment tracking** — every run logs parameters, metrics, the config file, the fitted transformer, and the trained model as artifacts; nested runs per model within a parent pipeline run
+- **SHAP explainability** — beeswarm, bar, waterfall, and dependence plots computed on the held-out test set after training and logged to MLflow; explainer auto-selected per model family (`TreeExplainer` / `LinearExplainer`)
+- **Leak-free, group-aware splitting** — train/test and cross-validation are partitioned by `patient_nbr` (via `StratifiedGroupKFold`) so the same patient never appears in both train and test, and folds preserve the class ratio
 - **MLflow Model Registry** — models are registered and promoted to stages (`Staging` / `Production`) for lifecycle management
 - **CLI inference script** — load from the registry or local `.joblib` files and score new patient records from the command line
 - **REST API** — FastAPI service with `/health`, `/predict`, and `/predict/batch` endpoints; model loaded once at startup via lifespan, Pydantic-validated request/response schemas, interactive docs at `/docs`
@@ -30,6 +32,7 @@ The primary goal is demonstrating **production-grade ML engineering practices** 
 | Area | Tools |
 |------|-------|
 | ML / Data | scikit-learn, XGBoost, LightGBM, CatBoost, pandas, NumPy |
+| Explainability | SHAP |
 | Experiment tracking | MLflow (tracking + model registry) |
 | Model serving | FastAPI, Uvicorn |
 | Config & validation | Pydantic v2, PyYAML |
