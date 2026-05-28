@@ -131,6 +131,13 @@ data_engineering:
   scaler: "standard"
   remainder: "drop"
   
+# SHAP explainability. Plots (beeswarm/bar/waterfall/dependence) are computed on
+# a sample of the test set after each model is trained and logged to MLflow.
+explainability:
+  enabled: true
+  sample_size: 2000   # rows sampled from the test set for SHAP
+  max_display: 20     # features shown in summary plots
+
 model:
   model_names:
     - xgboost

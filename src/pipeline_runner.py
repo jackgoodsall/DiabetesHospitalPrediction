@@ -20,6 +20,7 @@ from data_ingestion import BinaryReadmissionInputCleaningPipeline
 from components.data_engineering import DataEngineeringPipeLine
 from components.training_splits import split_df
 from components.model_evaluation import binary_classifcation_report
+from components.explainability import compute_and_log_shap
 from model_builder import build_estimator
 from model_trainer import ModelTrainer  
 
@@ -124,9 +125,13 @@ def run_ml_pipeline():
             data_transformer = DataEngineeringPipeLine(de_config)
             data_transformer.fit(X_train)
 
-            # Transform data arrays
-            X_train_transformed = data_transformer.transform(X_train).to_numpy()
+            # Transform data arrays (keep the column names for SHAP labelling)
+            X_train_transformed_df = data_transformer.transform(X_train)
+            feature_names = list(X_train_transformed_df.columns)
+            X_train_transformed = X_train_transformed_df.to_numpy()
             X_test_transformed = data_transformer.transform(X_test).to_numpy()
+
+            explain_config = config.model_extra.get("explainability", {})
 
             # --- 3. Model Training Loop ---
             trainer = ModelTrainer(seed=seed, n_splits=cv_folds)
@@ -161,6 +166,24 @@ def run_ml_pipeline():
 
                     mlflow.log_metrics(test_metrics)
                     mlflow.log_metrics({f"oof_{k}": v for k, v in oof_metrics.items()})
+
+                    # C2. Explainability (SHAP) — best-effort, never break training
+                    if explain_config.get("enabled", True):
+                        logger.info("Stage 3b: Computing SHAP explanations")
+                        try:
+                            compute_and_log_shap(
+                                final_trained_model,
+                                X_test_transformed,
+                                feature_names,
+                                model_name=model_name,
+                                sample_size=explain_config.get("sample_size", 2000),
+                                max_display=explain_config.get("max_display", 20),
+                            )
+                        except Exception:
+                            logger.warning(
+                                "SHAP explainability step failed; continuing without it.",
+                                exc_info=True,
+                            )
 
                     # D. Logging and Saving Artifacts (The Runner's responsibility!)
                     logger.info("Stage 4: Logging Artifacts")
