@@ -98,6 +98,7 @@ cloudpickle==3.1.2
     # via
     #   diabeteshospital
     #   mlflow-skinny
+    #   shap
 colorama==0.4.6 ; sys_platform == 'win32'
     # via
     #   click
@@ -408,6 +409,8 @@ multimethod==1.12
     #   diabeteshospital
     #   visions
     #   ydata-profiling
+mypy-extensions==1.1.0
+    # via typing-inspect
 narwhals==2.4.0
     # via
     #   diabeteshospital
@@ -439,7 +442,9 @@ notebook-shim==0.2.4
     #   diabeteshospital
     #   jupyterlab
 numba==0.61.0
-    # via ydata-profiling
+    # via
+    #   shap
+    #   ydata-profiling
 numexpr==2.12.1
     # via diabeteshospital
 numpy==1.26.4
@@ -461,6 +466,7 @@ numpy==1.26.4
     #   scikit-learn
     #   scipy
     #   seaborn
+    #   shap
     #   statsmodels
     #   visions
     #   wordcloud
@@ -502,7 +508,9 @@ packaging==25.0
     #   mlflow-skinny
     #   mlflow-tracing
     #   nbconvert
+    #   pandera
     #   plotly
+    #   shap
     #   statsmodels
 pandas==2.3.2
     # via
@@ -511,9 +519,12 @@ pandas==2.3.2
     #   mlflow
     #   phik
     #   seaborn
+    #   shap
     #   statsmodels
     #   visions
     #   ydata-profiling
+pandera==0.31.1
+    # via diabeteshospital
 pandocfilters==1.5.1
     # via
     #   diabeteshospital
@@ -606,6 +617,7 @@ pydantic==2.11.7
     #   fastapi
     #   mlflow-skinny
     #   mlflow-tracing
+    #   pandera
     #   ydata-profiling
 pydantic-core==2.33.2
     # via
@@ -649,7 +661,7 @@ pywin32==311 ; sys_platform == 'win32'
     # via
     #   docker
     #   jupyter-core
-pywinpty==3.0.3 ; os_name == 'nt'
+pywinpty==3.0.3 ; (python_full_version < '3.14' and os_name == 'nt') or (os_name == 'nt' and platform_machine != 'x86_64') or (os_name == 'nt' and sys_platform != 'darwin')
     # via
     #   jupyter-server
     #   jupyter-server-terminals
@@ -707,6 +719,7 @@ scikit-learn==1.7.2
     # via
     #   diabeteshospital
     #   mlflow
+    #   shap
 scipy==1.15.3
     # via
     #   catboost
@@ -716,6 +729,7 @@ scipy==1.15.3
     #   mlflow
     #   phik
     #   scikit-learn
+    #   shap
     #   statsmodels
     #   xgboost
     #   ydata-profiling
@@ -731,12 +745,16 @@ setuptools==80.9.0
     # via
     #   diabeteshospital
     #   jupyterlab
+shap==0.49.1
+    # via diabeteshospital
 six==1.17.0
     # via
     #   catboost
     #   diabeteshospital
     #   python-dateutil
     #   rfc3339-validator
+slicer==0.0.8
+    # via shap
 smmap==5.0.2
     # via
     #   diabeteshospital
@@ -794,6 +812,7 @@ tornado==6.5.2
 tqdm==4.67.1
     # via
     #   diabeteshospital
+    #   shap
     #   ydata-profiling
 traitlets==5.14.3
     # via
@@ -812,6 +831,7 @@ traitlets==5.14.3
 typeguard==4.4.4
     # via
     #   diabeteshospital
+    #   pandera
     #   ydata-profiling
 types-python-dateutil==2.9.0.20251008
     # via
@@ -829,13 +849,18 @@ typing-extensions==4.15.0
     #   opentelemetry-api
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
+    #   pandera
     #   pydantic
     #   pydantic-core
     #   referencing
+    #   shap
     #   sqlalchemy
     #   starlette
     #   typeguard
+    #   typing-inspect
     #   typing-inspection
+typing-inspect==0.9.0
+    # via pandera
 typing-inspection==0.4.1
     # via
     #   diabeteshospital

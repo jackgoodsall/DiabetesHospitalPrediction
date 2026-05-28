@@ -132,9 +132,14 @@ class CleanedDataSchema(pa.DataFrameModel):
     @pa.dataframe_check
     @classmethod
     def drop_columns_removed(cls, df: pa.typing.DataFrame) -> bool:
-        """Fail if any of the expected drop columns are still present."""
+        """Fail if any of the expected drop columns are still present.
+
+        Note: patient_nbr is deliberately NOT forbidden here. It is retained
+        through cleaning so the pipeline can perform a group-aware (leak-free)
+        train/test split on it, and is dropped only after splitting.
+        """
         forbidden = {
-            "encounter_id", "patient_nbr", "admission_type_id",
+            "encounter_id", "admission_type_id",
             "discharge_disposition_id", "admission_source_id",
             "max_glu_serum", "acetohexamide", "tolbutamide", "examide",
             "citoglipton", "glimepiride-pioglitazone",

@@ -29,7 +29,9 @@ data:
   - metformin-rosiglitazone
   - metformin-pioglitazone
   - encounter_id
-  - patient_nbr
+  # patient_nbr is intentionally NOT dropped here: it is retained through the
+  # split so train/test can be partitioned by patient (preventing the same
+  # patient appearing in both sets), then dropped before model training.
   - admission_type_id
   - discharge_disposition_id
   - admission_source_id
@@ -74,7 +76,18 @@ data:
     - tolazamide
     - insulin
     - diabetesMed
-   
+
+# Train/test split and cross-validation behaviour.
+#   group_column: rows sharing this value (a patient) are kept on the same side
+#                 of the split, preventing patient-level leakage. Set to null
+#                 to fall back to a plain row-level split.
+#   stratify:     preserve the target class ratio across train/test and CV folds.
+split:
+  group_column: patient_nbr
+  test_size: 0.2
+  stratify: true
+  cv_folds: 5
+
 data_engineering:
   numerical_features:
     - time_in_hospital
@@ -118,8 +131,15 @@ data_engineering:
   scaler: "standard"
   remainder: "drop"
   
+# SHAP explainability. Plots (beeswarm/bar/waterfall/dependence) are computed on
+# a sample of the test set after each model is trained and logged to MLflow.
+explainability:
+  enabled: true
+  sample_size: 2000   # rows sampled from the test set for SHAP
+  max_display: 20     # features shown in summary plots
+
 model:
-  model_names: 
+  model_names:
     - xgboost
     
 
