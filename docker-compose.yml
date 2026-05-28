@@ -1,0 +1,14 @@
+services:
+  api:
+    build:
+      context: .
+      args:
+        MODE: serve
+    environment:
+      APP_MODE: serve
+      MODEL_PATH: /app/artefacts/models/xgboost_20260303_225723.joblib
+      TRANSFORMER_PATH: /app/artefacts/pipeline/xgboost_transformer.joblib
+    volumes:
+      - ./artefacts:/app/artefacts:ro
+    ports:
+      - "8000:8000"

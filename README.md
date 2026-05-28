@@ -127,7 +127,7 @@ All endpoints are self-documented at **`http://localhost:8000/docs`** (Swagger U
 
 ```bash
 # Requires a trained model promoted to Production in the MLflow registry
-uv run uvicorn src.api:app --reload --port 8000
+uv run uvicorn api:app --app-dir src --reload --port 8000
 ```
 
 ### Example request
@@ -197,10 +197,16 @@ POST /predict?threshold=0.3
 
 Set environment variables to bypass the registry entirely:
 
+**Bash / macOS / Linux:**
 ```bash
-MODEL_PATH=artefacts/models/xgboost_20260303.joblib \
+MODEL_PATH=artefacts/models/xgboost_20260303_225723.joblib \
 TRANSFORMER_PATH=artefacts/pipeline/xgboost_transformer.joblib \
-uv run uvicorn src.api:app --port 8000
+uv run uvicorn api:app --app-dir src --port 8000
+```
+
+**PowerShell (Windows):**
+```powershell
+$env:MODEL_PATH="artefacts/models/xgboost_20260303_225723.joblib"; $env:TRANSFORMER_PATH="artefacts/pipeline/xgboost_transformer.joblib"; uv run uvicorn api:app --app-dir src --port 8000
 ```
 
 ---
@@ -276,10 +282,13 @@ Navigate to `http://localhost:5000` to explore runs, compare metrics, and inspec
 docker build -t diabetes-prediction .
 docker run diabetes-prediction
 
-# Serve the prediction API
+# Serve the prediction API (recommended — mounts local artefacts, no MLflow registry needed)
+docker compose up --build
+# API available at http://localhost:8000 — docs at http://localhost:8000/docs
+
+# Alternatively, build and run manually (requires a model promoted to Production in MLflow)
 docker build --build-arg MODE=serve -t diabetes-api .
 docker run -p 8000:8000 diabetes-api
-# API available at http://localhost:8000 — docs at http://localhost:8000/docs
 ```
 
 ### Run tests

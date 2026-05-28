@@ -20,7 +20,7 @@ ARG MODE=train
 ENV APP_MODE=${MODE}
 
 CMD if [ "$APP_MODE" = "serve" ]; then \
-        uvicorn src.api:app --host 0.0.0.0 --port 8000; \
+        uvicorn api:app --app-dir src --host 0.0.0.0 --port 8000; \
     else \
         python src/pipeline_runner.py; \
     fi
