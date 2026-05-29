@@ -5,25 +5,29 @@
 ![MLflow](https://img.shields.io/badge/MLflow-3.x-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-An end-to-end MLOps project for predicting 30-day hospital readmission of diabetic patients, built on 100,000+ real patient records from the [UCI Diabetes 130-US Hospitals dataset](https://archive.ics.uci.edu/dataset/296/diabetes+130-us+hospitals+for+years+1999-2008).
+An end-to-end MLOps project predicting 30-day hospital readmission for diabetic patients, using 100,000+ patient records from the [UCI Diabetes 130-US Hospitals dataset](https://archive.ics.uci.edu/dataset/296/diabetes+130-us+hospitals+for+years+1999-2008).
 
-The primary goal is demonstrating **production-grade ML engineering practices** — not just modelling. The pipeline is fully decoupled, config-driven, and reproducible. Swapping in a different dataset or model family requires only config changes.
+The focus is production-grade ML engineering rather than modelling. The pipeline is decoupled, config-driven, and reproducible. Changing the dataset or model only requires config changes.
 
 ---
 
-## Highlights
+## Features
 
-- **Fully decoupled pipeline** — data ingestion, feature engineering, training, and evaluation are independent components wired together by a single runner
-- **Config-driven** — all pipeline behaviour (features, models, hyperparameters, MLflow experiment name) is controlled via `configs/run_config.yaml`; no magic numbers in code
-- **Pydantic config validation** — configs are parsed into typed models at startup; misconfiguration raises a clear error before any data is touched
-- **MLflow experiment tracking** — every run logs parameters, metrics, the config file, the fitted transformer, and the trained model as artifacts; nested runs per model within a parent pipeline run
-- **SHAP explainability** — beeswarm, bar, waterfall, and dependence plots computed on the held-out test set after training and logged to MLflow; explainer auto-selected per model family (`TreeExplainer` / `LinearExplainer`)
-- **Leak-free, group-aware splitting** — train/test and cross-validation are partitioned by `patient_nbr` (via `StratifiedGroupKFold`) so the same patient never appears in both train and test, and folds preserve the class ratio
-- **MLflow Model Registry** — models are registered and promoted to stages (`Staging` / `Production`) for lifecycle management
-- **CLI inference script** — load from the registry or local `.joblib` files and score new patient records from the command line
-- **REST API** — FastAPI service with `/health`, `/predict`, and `/predict/batch` endpoints; model loaded once at startup via lifespan, Pydantic-validated request/response schemas, interactive docs at `/docs`
-- **Dockerised** — reproducible environment for both training and serving via a single Docker image with a `MODE` build argument
-- **CI with GitHub Actions** — tests run on every push and pull request via `uv`
+- **Decoupled pipeline** - data ingestion, feature engineering, training, evaluation, and explainability are separate components run by a single pipeline runner
+- **Config-driven** - all pipeline behaviour (features, models, hyperparameters, tuning, evaluation strategy, MLflow experiment name) is set in `configs/run_config.yaml` with no hardcoded values
+- **Pydantic config validation** - configs are parsed into typed models at startup; bad config raises an error before any data is loaded
+- **Pandera data validation** - schema checks on the raw CSV and cleaned DataFrame catch loading errors, encoding issues, and column-drop failures before training starts
+- **Optuna hyperparameter tuning** - optional Bayesian search over per-model search spaces using the same group-aware CV as training; each trial is logged as a nested MLflow run via `MLflowCallback`; toggled via `tuning:` in config
+- **MLflow experiment tracking** - every run logs parameters, metrics, the config file, the fitted transformer, and the trained model as artifacts; nested runs per model within a parent pipeline run
+- **Evaluation suite** - test-set metrics include AUC-ROC, PR-AUC, F1, Precision, Recall, Accuracy, and Brier score; ROC, Precision-Recall, and calibration curve plots are saved to MLflow; a dummy baseline is always logged for comparison
+- **Threshold selection** - decision threshold is chosen on OOF predictions (not the test set) using one of three strategies: `f1`, `recall@X`, or `default` (0.5)
+- **SHAP explainability** - beeswarm, bar, waterfall, and dependence plots computed on the held-out test set and logged to MLflow; explainer auto-selected per model family (`TreeExplainer` / `LinearExplainer`)
+- **Group-aware splitting** - train/test and cross-validation splits use `patient_nbr` via `StratifiedGroupKFold` so the same patient never appears in both sets
+- **MLflow Model Registry** - models are registered and promoted to stages (`Staging` / `Production`)
+- **CLI inference** - score new records from the command line, loading from the registry or local `.joblib` files
+- **REST API** - FastAPI service with `/health`, `/predict`, and `/predict/batch` endpoints; model loaded once at startup, Pydantic-validated schemas, Swagger docs at `/docs`
+- **Docker** - single image handles both training and serving via a `MODE` build argument
+- **CI** - tests run on every push and pull request via GitHub Actions and `uv`
 
 ---
 
@@ -32,7 +36,9 @@ The primary goal is demonstrating **production-grade ML engineering practices** 
 | Area | Tools |
 |------|-------|
 | ML / Data | scikit-learn, XGBoost, LightGBM, CatBoost, pandas, NumPy |
+| Hyperparameter tuning | Optuna, optuna-integration[mlflow] |
 | Explainability | SHAP |
+| Data validation | Pandera |
 | Experiment tracking | MLflow (tracking + model registry) |
 | Model serving | FastAPI, Uvicorn |
 | Config & validation | Pydantic v2, PyYAML |
@@ -48,83 +54,170 @@ The primary goal is demonstrating **production-grade ML engineering practices** 
 ```
 DiabetesHospitalPrediction/
 ├── .github/workflows/
-│   └── ci.yml                   # GitHub Actions CI pipeline
+│   └── ci.yml                    # GitHub Actions CI pipeline
 ├── configs/
-│   └── run_config.yaml          # Single source of truth for all pipeline config
+│   └── run_config.yaml           # All pipeline config
 ├── data/
-│   ├── raw_data/                # Raw CSVs (gitignored)
-│   └── processed_data/          # Cleaned data output
+│   ├── raw_data/                 # Raw CSVs (gitignored)
+│   └── processed_data/           # Cleaned data output
 ├── notebooks/
-│   └── data_visualisation.ipynb # Exploratory data analysis
+│   └── data_visualisation.ipynb  # Exploratory data analysis
 ├── src/
 │   ├── components/
-│   │   ├── config.py            # Pydantic config models + YAML loader
-│   │   ├── data_engineering.py  # sklearn ColumnTransformer pipeline
-│   │   ├── model_evaluation.py  # Metrics and classification report
-│   │   └── training_splits.py   # Stratified train/test split
-│   ├── data_ingestion.py        # Raw data loading and cleaning
-│   ├── model_builder.py         # Estimator factory (XGBoost, LightGBM, CatBoost, RF, LR, etc.)
-│   ├── model_trainer.py         # Cross-validated training with OOF metrics
-│   ├── pipeline_runner.py       # Orchestrates the full pipeline
-│   ├── inference.py             # CLI inference against registry or local files
-│   ├── api.py                   # FastAPI prediction service (health, predict, batch)
-│   └── schemas.py               # Pydantic request/response models for the API
+│   │   ├── config.py             # Pydantic config models + YAML loader
+│   │   ├── data_engineering.py   # sklearn ColumnTransformer pipeline
+│   │   ├── data_validation.py    # Pandera schemas (RawDataSchema, CleanedDataSchema)
+│   │   ├── explainability.py     # SHAP plot generation and MLflow logging
+│   │   ├── model_evaluation.py   # Metrics, threshold selection, dummy baseline, eval plots
+│   │   └── training_splits.py    # Stratified / group-aware train/test and CV splits
+│   ├── data_ingestion.py         # Raw data loading, cleaning, and Pandera validation
+│   ├── model_builder.py          # Model factory (XGBoost, LightGBM, CatBoost, RF, LR, etc.)
+│   ├── model_trainer.py          # Cross-validated training with OOF metrics
+│   ├── hyperparameter_tuner.py   # Optuna search spaces and tuning
+│   ├── pipeline_runner.py        # Runs the full pipeline end-to-end
+│   ├── inference.py              # CLI inference against registry or local files
+│   ├── api.py                    # FastAPI prediction service (health, predict, batch)
+│   └── schemas.py                # Pydantic request/response models for the API
 ├── artefacts/
-│   ├── models/                  # Saved .joblib model files
-│   └── pipeline/                # Saved transformer artifacts
-├── tests/                       # pytest test suite
+│   ├── models/                   # Saved .joblib model files
+│   ├── pipeline/                 # Saved transformer artifacts
+│   └── evaluation_plots/         # ROC, PR curve, calibration curve PNGs
+├── tests/                        # pytest test suite
 ├── Dockerfile
 └── pyproject.toml
 ```
 
 ---
 
-## Pipeline Architecture
+## Pipeline
 
 ```
 configs/run_config.yaml
-        │
-        ▼
-┌─────────────────────┐
-│   Data Ingestion    │  Load CSV → drop redundant columns → binary target
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Data Engineering   │  Numerical impute + scale │ Categorical impute + OHE
-└──────────┬──────────┘  (fitted on train, applied to test — no leakage)
-           │
-           ▼
-┌─────────────────────┐
-│   Model Training    │  Stratified K-fold CV → OOF metrics → refit on full train
-└──────────┬──────────┘  (one nested MLflow run per model)
-           │
-           ▼
-┌─────────────────────┐
-│    Evaluation       │  Test-set metrics: AUC-ROC, F1, Precision, Recall, Accuracy
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  MLflow Artifacts   │  Config, transformer (.joblib), model → MLflow registry
-└─────────────────────┘
+        |
+        v
++---------------------+
+|   Data Ingestion    |  Load CSV -> Pandera validation -> drop columns -> binary target
++----------+----------+
+           |
+           v
++---------------------+
+|  Group-Aware Split  |  patient_nbr keeps all encounters for one patient on the same side
++----------+----------+
+           |
+           v
++---------------------+
+|  Data Engineering   |  Numerical: impute + scale | Categorical: impute + OHE
++----------+----------+  (fitted on train only)
+           |
+           v
++---------------------+          +------------------------+
+|  [Optional] Optuna  +--------->+  Per-trial CV scoring  |
+|  Hyperparameter     |          |  (TPE sampler, nested  |
+|  Tuning             |          |   MLflow runs)         |
++----------+----------+          +------------------------+
+           | best params
+           v
++---------------------+
+|   Model Training    |  StratifiedGroupKFold CV -> OOF metrics -> refit on full train
++----------+----------+  (nested MLflow run per model)
+           |
+           v
++---------------------+
+|    Evaluation       |  Threshold on OOF -> test-set metrics + plots
++----------+----------+  (AUC-ROC, PR-AUC, F1, Brier; ROC/PR/calibration curves)
+           |
+           v
++---------------------+
+|  SHAP               |  Beeswarm, bar, waterfall, dependence plots -> MLflow
++----------+----------+
+           |
+           v
++---------------------+
+|  MLflow Artifacts   |  Config, transformer (.joblib), model -> MLflow registry
++---------------------+
 ```
+
+---
+
+## Supported Models
+
+All models are configured in `configs/run_config.yaml` and support Optuna tuning. Add any combination to `model.model_names`:
+
+| Key | Model |
+|-----|-------|
+| `xgboost` | XGBoost |
+| `lightgbm` | LightGBM |
+| `catboost` | CatBoost |
+| `random_forest` | sklearn RandomForestClassifier |
+| `extra_trees` | sklearn ExtraTreesClassifier |
+| `gradient_boosting` | sklearn GradientBoostingClassifier |
+| `logistic_regression` | sklearn LogisticRegression |
+
+---
+
+## Evaluation
+
+All threshold-based metrics use a threshold chosen from OOF predictions, not the test set.
+
+| Metric | Description |
+|--------|-------------|
+| `auc_roc` | Area under the ROC curve |
+| `pr_auc` | Area under the Precision-Recall curve |
+| `f1` | F1 score at the chosen threshold |
+| `precision` | Precision at the chosen threshold |
+| `recall` | Recall at the chosen threshold |
+| `accuracy` | Accuracy at the chosen threshold |
+| `brier_score` | Calibration quality (lower is better) |
+
+OOF versions are prefixed `oof_`. Dummy baseline versions are prefixed `dummy_`.
+
+Plots (ROC curve, PR curve, calibration curve) are saved to `artefacts/evaluation_plots/` and logged to MLflow.
+
+### Threshold strategies
+
+Set via `evaluation.threshold_strategy` in `run_config.yaml`:
+
+| Strategy | Behaviour |
+|----------|-----------|
+| `f1` | Threshold that maximises F1 on OOF predictions (default) |
+| `recall@0.X` | Smallest threshold that achieves recall >= X (e.g. `recall@0.8`) |
+| `default` | Fixed 0.5 |
+
+---
+
+## Hyperparameter Tuning
+
+Disabled by default. Enable in config:
+
+```yaml
+tuning:
+  enabled: true
+  n_trials: 50          # Optuna trials per model
+  metric: "pr_auc"      # pr_auc | auc_roc | f1 | brier_score
+  direction: "maximize" # maximize or minimize
+  cv_folds: 3           # CV folds inside the tuning objective
+  timeout: null         # optional time limit in seconds
+```
+
+When enabled, a TPE-sampler Optuna study runs before the final model refit. Each trial is logged as a nested MLflow run. The best hyperparameters are used for the final refit and evaluation.
+
+Search spaces for all seven model types are in `src/hyperparameter_tuner.py`.
 
 ---
 
 ## Model Serving API
 
-The trained model is exposed as a REST API built with FastAPI. The model and its preprocessing transformer are loaded from the MLflow registry once at server startup and reused for every request — avoiding the cost of deserialising a model file on every prediction.
+The model and preprocessing transformer are loaded from the MLflow registry once at startup and reused for all requests.
 
 ### Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Liveness check — returns model name, stage, and load status |
+| `GET` | `/health` | Returns model name, stage, and load status |
 | `POST` | `/predict` | Single-record prediction; returns probability and binary label |
-| `POST` | `/predict/batch` | Batch prediction; returns per-record results plus aggregate stats |
+| `POST` | `/predict/batch` | Batch prediction; returns per-record results and aggregate stats |
 
-All endpoints are self-documented at **`http://localhost:8000/docs`** (Swagger UI) once the server is running.
+Swagger UI is at **`http://localhost:8000/docs`**.
 
 ### Run the API locally
 
@@ -186,19 +279,14 @@ curl -X POST http://localhost:8000/predict \
 }
 ```
 
-The `threshold` query parameter adjusts the decision boundary without redeployment — useful for tuning the precision/recall trade-off:
+The `threshold` query parameter adjusts the decision boundary:
 
 ```bash
-# Flag fewer patients (higher precision)
-POST /predict?threshold=0.7
-
-# Flag more patients (higher recall)
-POST /predict?threshold=0.3
+POST /predict?threshold=0.7   # higher precision
+POST /predict?threshold=0.3   # higher recall
 ```
 
 ### Load from local files instead of MLflow
-
-Set environment variables to bypass the registry entirely:
 
 **Bash / macOS / Linux:**
 ```bash
@@ -216,7 +304,7 @@ $env:MODEL_PATH="artefacts/models/xgboost_20260303_225723.joblib"; $env:TRANSFOR
 
 ## Results
 
-Baseline XGBoost run (no hyperparameter tuning, no class imbalance handling):
+Baseline XGBoost (no tuning, no class imbalance handling):
 
 | Metric | OOF (CV) | Test set |
 |--------|----------|----------|
@@ -226,7 +314,7 @@ Baseline XGBoost run (no hyperparameter tuning, no class imbalance handling):
 | Precision | 0.617 | 0.626 |
 | Recall | 0.531 | 0.533 |
 
-OOF and test-set metrics track closely, indicating no significant overfitting.
+OOF and test metrics are close, with no sign of overfitting. Dummy baseline metrics are logged alongside every run.
 
 ---
 
@@ -235,8 +323,8 @@ OOF and test-set metrics track closely, indicating no significant overfitting.
 ### Prerequisites
 
 - Python 3.12+
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- Raw dataset CSV placed at `data/raw_data/diabetic_data.csv`
+- [uv](https://docs.astral.sh/uv/) or pip
+- Raw dataset CSV at `data/raw_data/diabetic_data.csv`
 
 ### Install
 
@@ -246,23 +334,23 @@ cd DiabetesHospitalPrediction
 uv sync
 ```
 
-### Run the full pipeline
+### Run the pipeline
 
 ```bash
 uv run python src/pipeline_runner.py
 ```
 
-This runs data ingestion → feature engineering → model training → evaluation → MLflow artifact logging in a single command.
+Runs: data ingestion, Pandera validation, feature engineering, optional Optuna tuning, model training, evaluation, SHAP, and MLflow logging.
 
 ### Run inference
 
 ```bash
-# Load from MLflow registry (Production stage)
+# From MLflow registry (Production stage)
 uv run python src/inference.py \
     --input data/raw_data/diabetic_data.csv \
     --model-name xgboost
 
-# Load from local files
+# From local files
 uv run python src/inference.py \
     --input data/raw_data/diabetic_data.csv \
     --model-path artefacts/models/xgboost_<timestamp>.joblib \
@@ -276,25 +364,25 @@ uv run python src/inference.py \
 uv run mlflow ui
 ```
 
-Navigate to `http://localhost:5000` to explore runs, compare metrics, and inspect artifacts.
+Go to `http://localhost:5000` to browse runs, metrics, SHAP plots, and evaluation curves.
 
-### Run with Docker
+### Docker
 
 ```bash
 # Train (default)
 docker build -t diabetes-prediction .
 docker run diabetes-prediction
 
-# Serve the prediction API (recommended — mounts local artefacts, no MLflow registry needed)
+# Serve via docker compose (mounts local artefacts, no MLflow registry needed)
 docker compose up --build
-# API available at http://localhost:8000 — docs at http://localhost:8000/docs
+# http://localhost:8000/docs
 
-# Alternatively, build and run manually (requires a model promoted to Production in MLflow)
+# Serve manually (requires a model in Production in MLflow)
 docker build --build-arg MODE=serve -t diabetes-api .
 docker run -p 8000:8000 diabetes-api
 ```
 
-### Run tests
+### Tests
 
 ```bash
 uv run pytest tests/ -v
@@ -304,21 +392,49 @@ uv run pytest tests/ -v
 
 ## Configuration
 
-All pipeline behaviour is controlled from `configs/run_config.yaml`. Key sections:
+Everything is in `configs/run_config.yaml`:
 
 ```yaml
+# Models to train
 model:
-  model_names: [xgboost]   # Add logistic_regression, random_forest, etc.
+  model_names: [xgboost, lightgbm]
 
+# Train/test split
+split:
+  group_column: patient_nbr   # prevents patient-level leakage
+  test_size: 0.2
+  stratify: true
+  cv_folds: 5
+
+# Feature preprocessing
 data_engineering:
   numerical_imputer_strat: mean
-  scaler: standard          # or minmax
+  scaler: standard            # or minmax
 
+# Threshold and baseline
+evaluation:
+  threshold_strategy: "f1"   # f1 | recall@0.X | default
+  dummy_strategy: "stratified"
+
+# SHAP
+explainability:
+  enabled: true
+  sample_size: 2000
+  max_display: 20
+
+# Optuna tuning (off by default)
+tuning:
+  enabled: false
+  n_trials: 50
+  metric: "pr_auc"
+  direction: "maximize"
+  cv_folds: 3
+
+# Per-model hyperparameters (used when tuning is off)
 xgboost:
   max_depth: 6
   eta: 0.1
   n_estimators: 1000
-  # ... full XGBoost param set
 ```
 
-Config is validated against Pydantic schemas at startup — invalid or missing fields raise a descriptive error immediately.
+Configs are validated against Pydantic schemas at startup. Input data is validated against Pandera schemas before any processing.
