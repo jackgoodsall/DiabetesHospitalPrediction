@@ -188,25 +188,34 @@ handled explicitly.
 
 ---
 
-## 5. Honest evaluation: PR-AUC, calibration, and threshold selection
+## 5. Honest evaluation: PR-AUC, calibration, and threshold selection — ✅ DONE
 
-**Priority: High · Effort: Low-Medium**
+**Priority: High · Effort: Low-Medium · Status: Implemented**
+
+> Implemented: `binary_classifcation_report` now returns `pr_auc` and `brier_score` alongside
+> the existing metrics. `select_threshold` chooses a decision threshold from OOF scores using
+> configurable strategies (`"f1"`, `"recall@X"`, `"default"`). `dummy_baseline_metrics` runs a
+> `DummyClassifier` and returns the same metric dict for comparison. Three plot helpers
+> (`plot_roc_curve`, `plot_pr_curve`, `plot_calibration_curve`) produce Matplotlib figures that
+> `pipeline_runner.py` saves to `artefacts/evaluation_plots/` and logs to MLflow under
+> `evaluation_plots/`. Dummy baseline metrics are logged as `dummy_*` keys. Threshold strategy
+> is controlled by `evaluation.threshold_strategy` in `run_config.yaml`. Covered by 10 new
+> tests in `tests/test_model_evaluation.py`.
 
 On an imbalanced clinical problem, ROC-AUC and a hard 0.5 threshold are the wrong defaults.
 
-### What to build
-- Add **PR-AUC (average precision)** and **Brier score** to the metrics report.
-- Add a **calibration curve** (reliability diagram) and consider
-  `CalibratedClassifierCV` — calibrated probabilities matter when clinicians act on them.
-- Add **decision-threshold selection** (maximise F1, or fix recall at a target operating point)
-  computed on validation, reported on test. The FastAPI layer already exposes a `threshold`
-  query param — close the loop by choosing it principally instead of defaulting to 0.5.
-- Add a **`DummyClassifier` baseline** so every metric is reported relative to a trivial model.
+### What was built
+- **PR-AUC (average precision)** and **Brier score** added to the metrics report.
+- **Calibration curve** (reliability diagram) logged to MLflow as an artifact.
+- **Decision-threshold selection** (`"f1"` maximise, `"recall@X"` target operating point)
+  computed on OOF predictions (validation signal), applied to the test set report.
+- **`DummyClassifier` baseline** — all metrics logged with `dummy_` prefix so gains are
+  immediately legible relative to a trivial model.
 
 ### Where
-- `src/components/model_evaluation.py` — extend the report; add plotting helpers
-- `src/pipeline_runner.py` — log PR/ROC/calibration curves as MLflow artifacts
-- `configs/run_config.yaml` — `evaluation.threshold_strategy`
+- `src/components/model_evaluation.py` — extended report + `select_threshold` + plot helpers
+- `src/pipeline_runner.py` — threshold selection, baseline logging, curve artifacts
+- `configs/run_config.yaml` — `evaluation:` section (`threshold_strategy`, `dummy_strategy`)
 
 ### What it adds to the CV
 - Shows evaluation maturity beyond a single accuracy number

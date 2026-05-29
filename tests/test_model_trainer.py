@@ -57,7 +57,7 @@ class TestTrainAndGetResults:
         X, y = small_X_y
         model = build_estimator("random_forest", n_estimators=10)
         _, oof_metrics, _ = trainer.train_and_get_results(model, X, y)
-        assert set(oof_metrics.keys()) == {"accuracy", "precision", "recall", "f1", "auc_roc"}
+        assert set(oof_metrics.keys()) == {"accuracy", "precision", "recall", "f1", "auc_roc", "pr_auc", "brier_score"}
 
     def test_oof_metrics_values_between_zero_and_one(self, trainer, small_X_y):
         X, y = small_X_y
