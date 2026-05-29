@@ -2,6 +2,9 @@ import logging
 import mlflow
 import numpy as np
 import joblib
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
 
@@ -19,7 +22,14 @@ from components.config import (
 from data_ingestion import BinaryReadmissionInputCleaningPipeline
 from components.data_engineering import DataEngineeringPipeLine
 from components.training_splits import split_df
-from components.model_evaluation import binary_classifcation_report
+from components.model_evaluation import (
+    binary_classifcation_report,
+    select_threshold,
+    dummy_baseline_metrics,
+    plot_roc_curve,
+    plot_pr_curve,
+    plot_calibration_curve,
+)
 from components.explainability import compute_and_log_shap
 from model_builder import build_estimator
 from model_trainer import ModelTrainer  
@@ -65,6 +75,11 @@ def run_ml_pipeline():
             data = data_input_pipeline.run_pipeline()
 
             target = config.data["target_column_name"]
+
+            # Evaluation config
+            eval_config = config.model_extra.get("evaluation", {})
+            threshold_strategy = eval_config.get("threshold_strategy", "f1")
+            dummy_strategy = eval_config.get("dummy_strategy", "stratified")
 
             # Split configuration. group_column (e.g. patient_nbr) makes the
             # split leak-free: all encounters for one patient stay on the same
@@ -162,10 +177,45 @@ def run_ml_pipeline():
                     test_predictions = final_trained_model.predict_proba(
                         X_test_transformed
                     )[:, 1]
-                    test_metrics = binary_classifcation_report(y_test, test_predictions)
+
+                    # Select threshold on OOF predictions (validation signal),
+                    # then report all metrics on the test set using that threshold.
+                    chosen_threshold = select_threshold(
+                        y_train, oof_predictions, strategy=threshold_strategy
+                    )
+                    logger.info(
+                        f"Threshold strategy '{threshold_strategy}' → threshold = {chosen_threshold:.4f}"
+                    )
+                    mlflow.log_param(f"{model_name}_threshold", chosen_threshold)
+
+                    test_metrics = binary_classifcation_report(
+                        y_test, test_predictions, threshold=chosen_threshold
+                    )
+                    baseline_metrics = dummy_baseline_metrics(
+                        y_test, strategy=dummy_strategy
+                    )
 
                     mlflow.log_metrics(test_metrics)
                     mlflow.log_metrics({f"oof_{k}": v for k, v in oof_metrics.items()})
+                    mlflow.log_metrics({f"dummy_{k}": v for k, v in baseline_metrics.items()})
+
+                    # C1. Evaluation plots (ROC, PR curve, calibration)
+                    try:
+                        import tempfile, os as _os
+                        plots_dir = Path("artefacts/evaluation_plots")
+                        plots_dir.mkdir(parents=True, exist_ok=True)
+
+                        for fig, name in [
+                            (plot_roc_curve(y_test, test_predictions, model_name), "roc_curve"),
+                            (plot_pr_curve(y_test, test_predictions, model_name), "pr_curve"),
+                            (plot_calibration_curve(y_test, test_predictions, model_name), "calibration_curve"),
+                        ]:
+                            plot_path = plots_dir / f"{model_name}_{name}.png"
+                            fig.savefig(plot_path, dpi=120, bbox_inches="tight")
+                            mlflow.log_artifact(str(plot_path), artifact_path="evaluation_plots")
+                            plt.close(fig)
+                    except Exception:
+                        logger.warning("Evaluation plot generation failed; continuing.", exc_info=True)
 
                     # C2. Explainability (SHAP) — best-effort, never break training
                     if explain_config.get("enabled", True):
