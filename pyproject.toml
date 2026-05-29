@@ -109,6 +109,8 @@ dependencies = [
     "opentelemetry-proto==1.38.0",
     "opentelemetry-sdk==1.38.0",
     "opentelemetry-semantic-conventions==0.59b0",
+    "optuna>=4.8.0",
+    "optuna-integration>=4.8.0",
     "packaging==25.0",
     "pandas==2.3.2",
     "pandera>=0.31.1",

@@ -17,7 +17,8 @@ from components.config import (
     load_yaml_config,
     ModelTrainingConfig,
     DataEngineeringConfig,
-    DataInputCleaningPipeLineConfig
+    DataInputCleaningPipeLineConfig,
+    TuningConfig,
 )
 from data_ingestion import BinaryReadmissionInputCleaningPipeline
 from components.data_engineering import DataEngineeringPipeLine
@@ -32,7 +33,8 @@ from components.model_evaluation import (
 )
 from components.explainability import compute_and_log_shap
 from model_builder import build_estimator
-from model_trainer import ModelTrainer  
+from model_trainer import ModelTrainer
+from hyperparameter_tuner import tune
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +82,9 @@ def run_ml_pipeline():
             eval_config = config.model_extra.get("evaluation", {})
             threshold_strategy = eval_config.get("threshold_strategy", "f1")
             dummy_strategy = eval_config.get("dummy_strategy", "stratified")
+
+            # Tuning config
+            tuning_config = TuningConfig(**config.model_extra.get("tuning", {}))
 
             # Split configuration. group_column (e.g. patient_nbr) makes the
             # split leak-free: all encounters for one patient stay on the same
@@ -163,6 +168,27 @@ def run_ml_pipeline():
 
                     # A. Build Model and Log Params
                     estimator_configs = config.model_extra.get(model_name, {})
+
+                    # Optional Optuna tuning — overwrites base config params with
+                    # the best params found, so the final refit uses the tuned model.
+                    if tuning_config.enabled:
+                        logger.info(f"Stage 3a: Optuna tuning for {model_name}")
+                        mlflow.log_param(f"{model_name}_tuning_trials", tuning_config.n_trials)
+                        best_params = tune(
+                            model_name=model_name,
+                            X_train=X_train_transformed,
+                            y_train=y_train,
+                            groups=groups_train,
+                            n_trials=tuning_config.n_trials,
+                            metric=tuning_config.metric,
+                            direction=tuning_config.direction,
+                            cv_folds=tuning_config.cv_folds,
+                            seed=seed,
+                            timeout=tuning_config.timeout,
+                            show_progress_bar=tuning_config.show_progress_bar,
+                        )
+                        estimator_configs = {**estimator_configs, **best_params}
+
                     current_model = build_estimator(model_name, **estimator_configs)
                     mlflow.log_params(estimator_configs)
 

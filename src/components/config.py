@@ -1,5 +1,5 @@
-from pydantic import ConfigDict, BaseModel, ValidationError
-from typing import Literal, Any, Dict, List
+from pydantic import ConfigDict, BaseModel, ValidationError, field_validator
+from typing import Literal, Any, Dict, List, Optional
 from dataclasses import dataclass
 import yaml
 import pandas as pd
@@ -54,6 +54,24 @@ class DataEngineeringConfig:
         if not combined_features <= dataframe_features:
             raise ValueError("Not all features are in the dataframe")
 
+
+
+class TuningConfig(BaseModel):
+    enabled: bool = False
+    n_trials: int = 50
+    metric: str = "pr_auc"
+    direction: Literal["maximize", "minimize"] = "maximize"
+    cv_folds: int = 3
+    timeout: Optional[int] = None  # seconds; None = no timeout
+    show_progress_bar: bool = False
+
+    @field_validator("metric")
+    @classmethod
+    def _valid_metric(cls, v: str) -> str:
+        allowed = {"pr_auc", "auc_roc", "f1", "brier_score"}
+        if v not in allowed:
+            raise ValueError(f"tuning.metric must be one of {allowed}, got '{v}'")
+        return v
 
 
 def load_yaml_config(config_path : Path,
