@@ -131,6 +131,21 @@ data_engineering:
   scaler: "standard"
   remainder: "drop"
   
+# Optuna hyperparameter tuning.
+#   enabled:    set to true to run a tuning study before the final model refit
+#   n_trials:   number of Optuna trials per model
+#   metric:     OOF metric to optimise (pr_auc | auc_roc | f1 | brier_score)
+#   direction:  maximize or minimize (brier_score should be minimize)
+#   cv_folds:   folds used inside the tuning objective (fewer than main CV is fine)
+#   timeout:    max seconds per study (null = no limit)
+tuning:
+  enabled: false
+  n_trials: 50
+  metric: "pr_auc"
+  direction: "maximize"
+  cv_folds: 3
+  timeout: null
+
 # Evaluation settings.
 #   threshold_strategy: how the decision threshold is chosen on the validation set.
 #     "f1"         — threshold that maximises F1 (good default for imbalanced data)

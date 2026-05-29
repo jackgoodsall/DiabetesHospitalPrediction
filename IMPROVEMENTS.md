@@ -256,23 +256,28 @@ SHAP values for the trained model, logged as MLflow artifacts.
 
 ---
 
-## 7. Hyperparameter tuning (Optuna)
+## 7. Hyperparameter tuning (Optuna) — ✅ DONE
 
-**Priority: Medium · Effort: Medium**
+**Priority: Medium · Effort: Medium · Status: Implemented**
 
-### What to build
-Optuna study with an MLflow callback, optimising **OOF PR-AUC** (consistent with the imbalanced
-framing) using the group-aware CV from item 1.
+> Implemented: `src/hyperparameter_tuner.py` defines per-model TPE search spaces for all 7
+> supported estimators (XGBoost, LightGBM, CatBoost, RandomForest, ExtraTrees, LogReg,
+> GradientBoosting). The `tune()` function runs an Optuna study with `MLflowCallback` logging
+> each trial as a nested MLflow run, optimising OOF PR-AUC (or any `TuningConfig` metric) using
+> the same group-aware CV as the main pipeline. Best params are merged over base config and used
+> for the final refit. Controlled by the `tuning:` section in `run_config.yaml`
+> (`enabled: false` by default). `TuningConfig` Pydantic model validates config. 20 new tests
+> in `tests/test_hyperparameter_tuner.py`.
 
-### Where
-- New: `src/hyperparameter_tuner.py` (study + per-model search spaces)
-- `src/pipeline_runner.py` — optional tuning phase before the final refit
+### What was built
+- `src/hyperparameter_tuner.py` — `tune()` public API + search spaces for all models
+- `src/pipeline_runner.py` — optional tuning phase (stage 3a) before final refit
 - `src/components/config.py` — `TuningConfig` Pydantic model
-- `configs/run_config.yaml` — `tuning:` section (`n_trials`, `direction`, `metric`)
+- `configs/run_config.yaml` — `tuning:` section (`enabled`, `n_trials`, `metric`, `direction`, `cv_folds`, `timeout`)
 
 ### What it adds to the CV
-- Optuna is industry-standard; MLflow integration is a strong signal
-- Only worth doing **after** items 1–4, otherwise you tune on a leaky/mis-framed objective
+- Optuna + MLflow integration is industry-standard and a strong signal
+- TPE sampler with group-aware OOF objective: tuning on a leak-free, correctly framed target
 
 ---
 
